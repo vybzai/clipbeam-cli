@@ -38,7 +38,7 @@ jobs:
       - uses: anchore/sbom-action/download-syft@v0
 
       - name: goreleaser release
-        uses: goreleaser/goreleaser-action@v6
+        uses: goreleaser/goreleaser-action@v7
         with:
           version: "~> v2.10"   # pinned (PLAN §9.2 version-pin discipline)
           args: release --clean
