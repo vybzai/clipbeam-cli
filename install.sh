@@ -195,7 +195,11 @@ trap 'rm -rf "$TMP"' EXIT INT TERM
 CHECKSUMS="${TMP}/checksums.txt"
 
 if [ -n "$VERSION" ]; then
-  ASSET="${BINARY}_${VERSION}_${OS}_${ARCH_ASSET}.tar.gz"
+  # The release TAG carries a leading "v" (v0.1.0) and names the download dir,
+  # but GoReleaser strips it from the archive name ({{.Version}} => 0.1.0), so the
+  # asset filename uses the v-stripped version. (POSIX ${VERSION#v} drops one
+  # leading "v" if present.)
+  ASSET="${BINARY}_${VERSION#v}_${OS}_${ARCH_ASSET}.tar.gz"
   BASE="${GITHUB}/releases/download/${VERSION}"
   info "installing ${BINARY} ${VERSION}"
   download "${BASE}/checksums.txt" "$CHECKSUMS" \
