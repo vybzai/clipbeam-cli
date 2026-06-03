@@ -7,6 +7,37 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The wire protocol version (`Envelope.version`) is the integer `1` and is
 decoupled from the CLI's SemVer — it is not bumped to match a release.
 
+## [0.1.1] - 2026-06-03
+
+### Fixed
+- **Installer**: the one-line `curl | sh` now resolves real release assets. Two
+  bugs are fixed — the repo slug (was a leftover `clipbeam/clipbeam` placeholder
+  → now `vybzai/clipbeam-cli`) and the archive name (the release TAG carries a
+  leading `v`, but GoReleaser strips it from `{{.Version}}`, so the asset is
+  `clipbeam_0.1.0_<os>_<arch>.tar.gz`). Verified end-to-end on a real Linux box.
+- **SSH auth**: an empty-but-present `ssh-agent` (`$SSH_AUTH_SOCK` set, 0
+  identities) no longer shadows the on-disk key — agent and file signers are
+  merged into a single publickey method, matching OpenSSH's fallback.
+- **`send`/`msg` over SSH**: the SSH-exec path now invokes the alias's recorded
+  absolute `remoteBinPath` (and resolves an alias by host as well as name),
+  fixing `clipbeam: command not found` immediately after `setup`.
+- **`last`/`wait`**: fall back to the on-disk `last_path` when no daemon is
+  running, so `$(clipbeam last)` works after a daemonless `setup` (a reachable
+  daemon still takes precedence).
+- **Agent channel over SSH**: `recv` now drains SSH-delivered text and file items
+  exactly once from a disk-backed FIFO journal. The journal is written only by
+  the one-shot `ingest` path; the `serve` daemon stays in-memory-only (no
+  unbounded growth, no plaintext retention, no double delivery).
+
+### Added
+- `clipbeam setup --from-release`: bootstrap a box by having it run the published
+  installer over SSH (curl/wget), plus a tarball download-and-stream install path
+  so a released binary with no Go toolchain can set up a remote box.
+
+### Docs
+- README leads with the agent-first value; removed dead links; dropped the
+  phantom `clipbeam self-update` reference.
+
 ## [0.1.0] - 2026-06-03
 
 ### Added
@@ -33,4 +64,5 @@ decoupled from the CLI's SemVer — it is not bumped to match a release.
 - Distribution: `install.sh`, GoReleaser config (multi-arch archives, checksums,
   SBOM, Homebrew cask, cosign keyless signing), and CI.
 
+[0.1.1]: https://github.com/vybzai/clipbeam-cli/releases/tag/v0.1.1
 [0.1.0]: https://github.com/vybzai/clipbeam-cli/releases/tag/v0.1.0

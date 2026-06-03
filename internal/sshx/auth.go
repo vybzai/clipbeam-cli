@@ -73,6 +73,9 @@ func (fileAuthProvider) methods(t Target) ([]ssh.AuthMethod, func(), error) {
 			// Swallow a broken/empty agent's error so it never poisons the file keys: an
 			// empty agent yields nil signers, a dead socket yields an error we ignore.
 			if conn, ags, err := agentFn(); err == nil {
+				if agentConn != nil {
+					_ = agentConn.Close() // close a prior invocation's conn before overwriting (no leak on retry)
+				}
 				agentConn = conn
 				out = append(out, ags...)
 			} else if conn != nil {
