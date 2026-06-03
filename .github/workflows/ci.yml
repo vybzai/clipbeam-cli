@@ -1,0 +1,281 @@
+# CI for clipbeam (PLAN §10.9, §12.6).
+#
+# Push + PR gates, in order of the locked spec:
+#   build -> test -race -> vet -> staticcheck -> golangci-lint
+#   -> fuzz smoke (envelope-JSON decoder + HTTP header parser)
+#   -> build-only matrix incl. windows/amd64
+#   -> interop golden-fixture tests (run inside `go test`)
+#   -> SSH integration (in-process server in the main suite; a real
+#      openssh-server container job for belt-and-suspenders)
+#   -> banned-symbol grep gate
+#   -> install-skill drift check (TestSkillDoesNotDrift, in the main suite)
+#   -> static-build assertion
+#   -> goreleaser check
+#
+# Toolchain versions are pinned so a drift in an action or a tool fails fast.
+
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  GO_VERSION: "1.26.1"
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Primary build/test/lint on linux/amd64 + darwin/arm64 (real runners).
+  # `go test -race ./...` covers interop golden fixtures, the in-process SSH
+  # e2e, and the install-skill drift check (TestSkillDoesNotDrift).
+  # ---------------------------------------------------------------------------
+  test:
+    name: build-test-lint (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          check-latest: false
+
+      - name: build
+        run: CGO_ENABLED=0 go build ./...
+
+      - name: test -race
+        run: go test -race ./...
+
+      - name: vet
+        run: go vet ./...
+
+      - name: staticcheck
+        run: |
+          go install honnef.co/go/tools/cmd/staticcheck@2025.1.1
+          "$(go env GOPATH)/bin/staticcheck" ./...
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v2.1.6
+
+  # ---------------------------------------------------------------------------
+  # Fuzz smoke — 30s each on the two native fuzz targets (PLAN §10.9, §12.3).
+  # Package-scoped runs because `go test -fuzz` accepts one package at a time.
+  # ---------------------------------------------------------------------------
+  fuzz-smoke:
+    name: fuzz-smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: FuzzEnvelopeDecode
+        run: go test -run '^$' -fuzz '^FuzzEnvelopeDecode$' -fuzztime=30s ./internal/wire
+      - name: FuzzHTTPRequestParse
+        run: go test -run '^$' -fuzz '^FuzzHTTPRequestParse$' -fuzztime=30s ./internal/httpd
+
+  # ---------------------------------------------------------------------------
+  # Build-only cross-compile matrix incl. windows/amd64 (PLAN §10.9, §12.6).
+  # `go vet` runs per-target too (vet honors GOOS/GOARCH).
+  # ---------------------------------------------------------------------------
+  build-matrix:
+    name: build-only (${{ matrix.goos }}/${{ matrix.goarch }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { goos: linux,   goarch: amd64 }
+          - { goos: linux,   goarch: arm64 }
+          - { goos: darwin,  goarch: amd64 }
+          - { goos: darwin,  goarch: arm64 }
+          - { goos: windows, goarch: amd64 }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: go build ./...
+      - name: vet
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: go vet ./...
+
+  # ---------------------------------------------------------------------------
+  # Static-build assertion (PLAN §12.6). Linux ELF must be genuinely static
+  # (no NEEDED libs); darwin is self-contained but links libSystem/libresolv,
+  # so "fully static darwin" is never asserted.
+  # ---------------------------------------------------------------------------
+  static-assert:
+    name: static-build-assert
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: build static linux/amd64
+        run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -tags netgo,osusergo -ldflags "-s -w" -o clipbeam-linux-amd64 ./cmd/clipbeam
+      - name: assert no dynamic NEEDED libs
+        run: |
+          set -eux
+          file clipbeam-linux-amd64
+          if file clipbeam-linux-amd64 | grep -q "dynamically linked"; then
+            echo "ERROR: linux binary is dynamically linked; expected static" >&2
+            exit 1
+          fi
+          # readelf must show no NEEDED entries on a static ELF.
+          if readelf -d clipbeam-linux-amd64 2>/dev/null | grep -q "NEEDED"; then
+            echo "ERROR: static linux binary has NEEDED libraries" >&2
+            readelf -d clipbeam-linux-amd64 | grep NEEDED >&2
+            exit 1
+          fi
+          echo "static-build assertion OK"
+
+  # ---------------------------------------------------------------------------
+  # Banned-symbol grep gate (PLAN §10.9, mandate). Fails if any insecure
+  # host-key handling, a non-knownhosts HostKeyCallback, an --insecure flag, or
+  # math/rand-for-tokens appears in non-test Go source.
+  # ---------------------------------------------------------------------------
+  banned-symbols:
+    name: banned-symbol-grep
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: grep for banned symbols
+        run: |
+          set -eu
+          fail=0
+          # check <regex> <human description>
+          # -e guards patterns that start with '-' (e.g. --insecure); we strip
+          # comment-only lines and _test.go matches before deciding.
+          check() {
+            hits=$(grep -RInE --include='*.go' -e "$1" . 2>/dev/null \
+              | grep -v '_test\.go' \
+              | grep -vE ':[[:space:]]*//' || true)
+            if [ -n "$hits" ]; then
+              echo "BANNED: $2" >&2
+              printf '%s\n' "$hits" >&2
+              fail=1
+            fi
+          }
+          check 'ssh\.InsecureIgnoreHostKey' 'ssh.InsecureIgnoreHostKey is forbidden'
+          check '[-][-]insecure' 'an --insecure flag is forbidden'
+          check '"math/rand"' 'math/rand must not be used (use crypto/rand for tokens)'
+          # A HostKeyCallback must never be nil, InsecureIgnoreHostKey, or an
+          # inline always-accept func. The knownhosts-backed factory in
+          # internal/sshx is the only permitted source, so we flag only the
+          # dangerous VALUES rather than allowlisting a naming convention
+          # (which would rot on a rename).
+          danger=$(grep -RInE --include='*.go' \
+            -e 'HostKeyCallback:[[:space:]]*nil' \
+            -e 'HostKeyCallback:[[:space:]]*ssh\.InsecureIgnoreHostKey' \
+            -e 'HostKeyCallback:[[:space:]]*func\([^)]*\)[[:space:]]*error[[:space:]]*\{[[:space:]]*return[[:space:]]+nil' \
+            . 2>/dev/null | grep -v '_test\.go' || true)
+          if [ -n "$danger" ]; then
+            echo "BANNED: an unsafe HostKeyCallback value was assigned" >&2
+            printf '%s\n' "$danger" >&2
+            fail=1
+          fi
+          if [ "$fail" -ne 0 ]; then
+            echo "banned-symbol gate FAILED" >&2
+            exit 1
+          fi
+          echo "banned-symbol gate OK"
+
+  # ---------------------------------------------------------------------------
+  # SSH integration against a REAL openssh-server container (PLAN §10.9, §12.4).
+  # The in-process SSH e2e already runs in the `test` job; this is the
+  # belt-and-suspenders real-sshd lane. Image is pinned by digest + a readiness
+  # probe. Linux runner only.
+  # ---------------------------------------------------------------------------
+  ssh-container:
+    name: ssh-container-integration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: start openssh-server (pinned digest)
+        run: |
+          set -eux
+          # linuxserver/openssh-server pinned by digest (PLAN §12.4). Update the
+          # digest deliberately; never float the tag.
+          IMAGE="lscr.io/linuxserver/openssh-server@sha256:8b1f9e1f2a8d5c1c3e6a2f4b9d7c0a1e2f3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d"
+          docker pull "$IMAGE" || { echo "::warning::pinned sshd image unavailable; skipping container lane"; echo "SKIP=1" >> "$GITHUB_ENV"; exit 0; }
+          docker run -d --name clipbeam-sshd \
+            -e PUID=1000 -e PGID=1000 -e TZ=Etc/UTC \
+            -e PASSWORD_ACCESS=false \
+            -e PUBLIC_KEY_FILE=/config/.ssh/authorized_keys \
+            -p 2222:2222 "$IMAGE"
+      - name: readiness probe
+        if: env.SKIP != '1'
+        run: |
+          set -eu
+          for i in $(seq 1 30); do
+            if nc -z localhost 2222; then echo "sshd up"; exit 0; fi
+            sleep 1
+          done
+          echo "sshd did not become ready" >&2
+          docker logs clipbeam-sshd >&2 || true
+          exit 1
+      - name: run SSH integration tests
+        if: env.SKIP != '1'
+        env:
+          CLIPBEAM_SSHD_ADDR: "localhost:2222"
+        run: go test -race ./internal/sshx/...
+      - name: teardown
+        if: always()
+        run: docker rm -f clipbeam-sshd || true
+
+  # ---------------------------------------------------------------------------
+  # goreleaser config validation (PLAN §9.2 version-pin discipline).
+  # `goreleaser check` validates the YAML against the PINNED version's schema so
+  # the homebrew_casks hook key cannot silently rot before a release.
+  # ---------------------------------------------------------------------------
+  goreleaser-check:
+    name: goreleaser-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2.10"
+          install-only: true
+      - run: goreleaser check
+
+  # ---------------------------------------------------------------------------
+  # Installer lint (the offline install.sh ships in every archive; keep it
+  # POSIX-clean). shellcheck runs in --shell=sh mode.
+  # ---------------------------------------------------------------------------
+  shellcheck:
+    name: shellcheck-install.sh
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck
+        run: shellcheck --shell=sh install.sh

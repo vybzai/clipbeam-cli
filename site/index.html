@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>clipbeam — beam files into your remote agent's reach</title>
+<meta name="description" content="A single static CLI that beams files, screenshots, and clipboard into a headless box you're SSH'd into — over SSH or Tailscale. Built for coding agents. No cloud, no account.">
+<style>
+  :root { --bg:#0b0d10; --fg:#e8eaed; --muted:#9aa3ad; --accent:#5db0ff; --card:#14181d; --line:#222a31; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
+  .wrap { max-width:760px; margin:0 auto; padding:72px 20px 96px; }
+  h1 { font-size:44px; margin:0 0 6px; letter-spacing:-1px; }
+  .tag { color:var(--accent); font-size:18px; margin:0 0 8px; }
+  .sub { color:var(--muted); margin:0 0 36px; }
+  pre { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px 18px; overflow:auto; }
+  code { color:#d6dee6; }
+  .c { color:var(--muted); }
+  h2 { font-size:14px; text-transform:uppercase; letter-spacing:1.5px; color:var(--muted); margin:44px 0 12px; }
+  a { color:var(--accent); text-decoration:none; }
+  a:hover { text-decoration:underline; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th,td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--muted); font-weight:600; }
+  footer { margin-top:56px; color:var(--muted); font-size:13px; border-top:1px solid var(--line); padding-top:20px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>clipbeam</h1>
+  <p class="tag">Beam files, screenshots, and clipboard straight into your remote agent's reach.</p>
+  <p class="sub">Over SSH or Tailscale. No cloud, no account. Built for coding agents — every command is <code>--json</code>-able and self-describing.</p>
+
+  <h2>Install</h2>
+  <pre><code>brew install vybzai/tap/clipbeam
+<span class="c"># or</span>
+curl -fsSL https://raw.githubusercontent.com/vybzai/clipbeam-cli/main/install.sh | sh</code></pre>
+
+  <h2>Use</h2>
+  <pre><code><span class="c"># once per box — bootstraps the remote binary over your existing SSH</span>
+clipbeam setup root@my-box
+
+<span class="c"># then, from your laptop</span>
+clipbeam send screenshot.png my-box   <span class="c"># → prints the remote path</span>
+clipbeam shot my-box                  <span class="c"># screenshot → box</span>
+
+<span class="c"># on the box, your agent just reads the path</span>
+claude "what's in $(clipbeam last)"</code></pre>
+
+  <h2>Why</h2>
+  <p class="sub">You can't paste an image into a TUI over SSH — the terminal reads your local clipboard, and nothing crosses the SSH boundary. The only thing a remote agent can ingest is a real file on the box's disk it can read by path. clipbeam puts it there and prints the path.</p>
+
+  <h2>vs. the alternatives</h2>
+  <table>
+    <tr><th></th><th>image into a remote TUI</th><th>encrypted</th><th>zero extra account</th><th>agent-native</th></tr>
+    <tr><td>clipbeam</td><td>✅ disk + path</td><td>✅ SSH / WireGuard</td><td>✅ rides your SSH</td><td>✅</td></tr>
+    <tr><td>scp / rsync</td><td>⚠️ manual</td><td>✅</td><td>✅</td><td>❌</td></tr>
+    <tr><td>pastebins</td><td>❌</td><td>⚠️</td><td>❌</td><td>❌</td></tr>
+  </table>
+
+  <footer>
+    Push-only — nothing leaves a machine unless you act. Open source (MIT).
+    &nbsp;·&nbsp; <a href="https://github.com/vybzai/clipbeam-cli">GitHub</a>
+    &nbsp;·&nbsp; <a href="https://github.com/vybzai/clipbeam-cli/blob/main/PROTOCOL.md">Protocol</a>
+    &nbsp;·&nbsp; <a href="https://github.com/vybzai/clipbeam-cli/blob/main/SECURITY.md">Security</a>
+  </footer>
+</div>
+</body>
+</html>

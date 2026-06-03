@@ -1,0 +1,12 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/vybzai/clipbeam-cli/security/advisories/new
+    about: >-
+      Do NOT open a public issue for a security vulnerability. Report privately
+      via a GitHub Security Advisory (see SECURITY.md, 90-day disclosure window).
+  - name: Protocol / wire questions
+    url: https://github.com/vybzai/clipbeam-cli/blob/main/PROTOCOL.md
+    about: >-
+      The Envelope v1 wire is frozen and brand-independent. Read PROTOCOL.md
+      before filing a wire-related issue.

@@ -1,0 +1,33 @@
+# Binaries
+/clipbeam
+/clipbeam.exe
+clipbeam_*
+*.test
+*.out
+
+# Build / release artifacts
+/dist/
+/build/
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+coverage.out
+coverage.html
+
+# Editor / OS cruft
+.DS_Store
+*.swp
+*~
+.idea/
+.vscode/
+
+# Local secrets / state (never commit)
+/token
+*.token
+
+# OMC orchestration state
+/.omc/

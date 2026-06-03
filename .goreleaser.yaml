@@ -1,0 +1,155 @@
+# GoReleaser pipeline for clipbeam (PLAN §9.3, §9.2, §10.8).
+#
+# Runs on a v* git tag via .github/workflows/release.yml. Produces genuinely
+# static Linux ELFs and self-contained darwin Mach-O binaries (CGO_ENABLED=0,
+# netgo + osusergo), a darwin universal binary, tar.gz archives carrying the
+# offline installer + docs, a SHA-256 checksums.txt, a syft SBOM, a Homebrew
+# cask in <org>/homebrew-tap with the quarantine-strip post-install hook, and a
+# cosign keyless signature over checksums.txt.
+#
+# M4 VERSION-PIN NOTE (PLAN §9.2): the homebrew_casks `hooks.post.install` key
+# and the `system_command` quarantine-strip syntax below were confirmed against
+# GoReleaser v2.10+ (the brews:->homebrew_casks: migration that introduced the
+# cask hook slot). CI pins the GoReleaser version (release.yml) and runs
+# `goreleaser check` so a future schema shift fails fast instead of at release.
+#
+# Validate locally with: goreleaser check
+# Dry-run a release with:  goreleaser release --snapshot --clean --skip=sign,publish
+
+version: 2
+
+project_name: clipbeam
+
+before:
+  hooks:
+    - go mod tidy
+    - go mod download
+
+builds:
+  - id: clipbeam
+    main: ./cmd/clipbeam
+    binary: clipbeam
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    tags:
+      - netgo
+      - osusergo
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+# Darwin universal (fat) binary via lipo (PLAN §9.3). The per-arch darwin
+# binaries are replaced by the universal one in the darwin archives.
+universal_binaries:
+  - id: clipbeam
+    replace: true
+
+archives:
+  - id: clipbeam
+    ids:
+      - clipbeam
+    formats:
+      - tar.gz
+    # clipbeam_<version>_<os>_<arch>.tar.gz (the installer derives this name).
+    # The darwin universal binary reports Arch "all" -> rendered as "universal".
+    # Single-line template to avoid YAML folded-scalar whitespace ambiguity.
+    name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ if eq .Arch "all" }}universal{{ else }}{{ .Arch }}{{ end }}'
+    # install.sh is this lane's deliverable and always present; the docs are
+    # M5-lane deliverables — use globs so a missing optional doc never fails the
+    # release (a non-glob `files` entry that matches nothing is a hard error).
+    files:
+      - install.sh
+      - README*
+      - LICENSE*
+      - SECURITY*
+      - PROTOCOL*
+
+checksums:
+  name_template: checksums.txt
+  algorithm: sha256
+
+# Software Bill of Materials via syft (PLAN §9.3, §10.8).
+sboms:
+  - id: archive
+    artifacts: archive
+
+# Keyless cosign signature over checksums.txt (PLAN §9.3). Produces
+# checksums.txt.sig + checksums.txt.pem via Sigstore Fulcio/Rekor using the
+# GitHub Actions OIDC token. Gated to the release workflow; dry runs pass
+# --skip=sign. cosign auto-detects the ambient OIDC token in CI.
+signs:
+  - id: cosign-checksums
+    cmd: cosign
+    artifacts: checksum
+    certificate: "${artifact}.pem"
+    args:
+      - sign-blob
+      - "--output-certificate=${certificate}"
+      - "--output-signature=${signature}"
+      - "${artifact}"
+      - "--yes"
+
+# Homebrew cask in the dedicated tap (PLAN §9.2). `brews:` is deprecated since
+# GoReleaser v2.10; `homebrew_casks:` is the supported block for pre-compiled
+# CLI binaries. Pushed with HOMEBREW_TAP_GITHUB_TOKEN.
+homebrew_casks:
+  - name: clipbeam
+    repository:
+      owner: vybzai              # your GitHub account (tap repo: vybzai/homebrew-tap)
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    homepage: "https://github.com/vybzai/clipbeam-cli"
+    description: "Beam files, screenshots, and clipboard straight into your remote agent's reach — over SSH or Tailscale."
+    license: "MIT"
+    url:
+      verified: "github.com/vybzai/clipbeam-cli"
+    # The binary is UNSIGNED (PLAN §9.2, §10.8): Homebrew does NOT auto-bypass
+    # Gatekeeper for an unsigned cask binary. The quarantine-strip post-install
+    # hook is the exact mechanism that makes it launchable. Confirmed against
+    # the GoReleaser v2.10+ cask hook schema (M4 version-pin note above).
+    #
+    # M4 CAVEAT (PLAN §9.2): keep the GoReleaser version pinned in CI; the cask
+    # hook key shifted across the brews:->homebrew_casks: migration. Re-confirm
+    # this `hooks.post.install` slot against the pinned version's docs before the
+    # first real release.
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/clipbeam"]
+          end
+
+release:
+  github:
+    owner: vybzai               # your GitHub account
+    name: clipbeam-cli
+  draft: false
+  prerelease: auto
+  footer: |
+    ---
+    Install: `curl -fsSL https://raw.githubusercontent.com/vybzai/clipbeam-cli/main/install.sh | sh`
+    Homebrew: `brew install vybzai/tap/clipbeam`
+    go install: `go install github.com/vybzai/clipbeam-cli/cmd/clipbeam@latest`
+
+    Verify the download: SHA-256 against `checksums.txt` (default), or cosign
+    keyless over `checksums.txt.sig` + `checksums.txt.pem`.
+
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^ci:"
+      - Merge pull request
+      - Merge branch

@@ -1,0 +1,5 @@
+type: text
+sender: macbook.example
+text: line one
+line two: with colon
+line three

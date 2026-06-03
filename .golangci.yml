@@ -1,0 +1,44 @@
+# golangci-lint config for clipbeam (PLAN §10.6, §10.9, §12.6).
+#
+# Run with: golangci-lint run
+# Schema: golangci-lint v2 (run `golangci-lint run` in CI; the pinned version
+# lives in .github/workflows/ci.yml).
+
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  default: standard
+  enable:
+    - bodyclose      # network-facing HTTP client/server: never leak response bodies
+    - errcheck       # unchecked errors hide silent failures
+    - govet
+    - ineffassign
+    - misspell
+    - revive         # idiomatic Go + exported-symbol godoc discipline
+    - staticcheck
+    - unconvert
+    - unused
+  settings:
+    revive:
+      rules:
+        - name: exported
+          disabled: false
+    misspell:
+      locale: US
+  exclusions:
+    generated: lax
+    rules:
+      # Tests may use less strict error checking and helper patterns.
+      - path: _test\.go
+        linters:
+          - errcheck
+          - bodyclose
+
+formatters:
+  enable:
+    - gofmt
+    - goimports

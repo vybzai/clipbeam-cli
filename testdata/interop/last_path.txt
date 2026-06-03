@@ -1,0 +1,1 @@
+/home/agent/.local/share/clipbeam/screenshot.png
