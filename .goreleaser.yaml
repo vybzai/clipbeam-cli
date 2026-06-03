@@ -102,6 +102,10 @@ signs:
 # CLI binaries. Pushed with HOMEBREW_TAP_GITHUB_TOKEN.
 homebrew_casks:
   - name: clipbeam
+    # Skip the tap push when no token is configured (e.g. the very first release
+    # before HOMEBREW_TAP_GITHUB_TOKEN is set) so the release still goes green;
+    # binaries/checksums/SBOM/signature ship regardless. Set the secret to enable.
+    skip_upload: '{{ if eq (envOrDefault "HOMEBREW_TAP_GITHUB_TOKEN" "") "" }}true{{ else }}false{{ end }}'
     repository:
       owner: vybzai              # your GitHub account (tap repo: vybzai/homebrew-tap)
       name: homebrew-tap
