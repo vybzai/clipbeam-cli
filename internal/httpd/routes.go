@@ -247,7 +247,7 @@ func (s *Server) handleRecv(w http.ResponseWriter, r *http.Request) {
 	}
 	// Park up to timeout, but bound the wait to the request context too (a client
 	// disconnect cancels it). The server-side connection deadline grace (+15) is the
-	// Swift connection-deadline analogue; net/http manages the write deadline itself,
+	// Swift connection-deadline analog; net/http manages the write deadline itself,
 	// so the context deadline IS the poll window here.
 	deadline := time.Duration(timeout)*time.Second + recvDeadlineGrace
 	ctx, cancel := context.WithTimeout(r.Context(), deadline)

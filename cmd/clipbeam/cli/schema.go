@@ -4,15 +4,15 @@ package cli
 // the entire surface so an agent can introspect at runtime. `clipbeam schema` and
 // `clipbeam help --json` both emit it.
 type schemaDoc struct {
-	Schema       string          `json:"schema"`
-	OK           bool            `json:"ok"`
-	Binary       string          `json:"binary"`
-	Version      string          `json:"version"`
-	WireProtocol string          `json:"wireProtocol"`
-	ExitCodes    []exitCodeDoc   `json:"exitCodes"`
-	Env          []envVarDoc     `json:"env"`
-	Commands     []commandDoc    `json:"commands"`
-	Channels     channelsDoc     `json:"channels"`
+	Schema       string        `json:"schema"`
+	OK           bool          `json:"ok"`
+	Binary       string        `json:"binary"`
+	Version      string        `json:"version"`
+	WireProtocol string        `json:"wireProtocol"`
+	ExitCodes    []exitCodeDoc `json:"exitCodes"`
+	Env          []envVarDoc   `json:"env"`
+	Commands     []commandDoc  `json:"commands"`
+	Channels     channelsDoc   `json:"channels"`
 }
 
 // exitCodeDoc is one row of the unified exit-code table (PLAN §8.3).

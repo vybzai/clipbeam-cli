@@ -41,12 +41,12 @@ func TestJSONStringReaderEscapes(t *testing.T) {
 		{"control escapes", `"\b\f\n\r\t"`, "\b\f\n\r\t"},
 		// \uXXXX escapes: the input carries LITERAL backslash-u sequences (built with a
 		// raw backtick string), driving readUnicodeEscape / readHex4 / encodeRune.
-		{`u-escape ASCII`, "\"\\u0041\\u0042\"", "AB"},                 // A,B
-		{`u-escape 2-byte`, "\"a\\u00e9b\"", "aéb"},               // é (C3 A9)
-		{`u-escape 3-byte`, "\"\\u20ac\"", "€"},                   // € (E2 82 AC)
-		{`u-escape boundary`, "\"\\u00ff\"", "ÿ"},                 // ÿ (C3 BF)
-		{`u-escape surrogate pair`, "\"x\\ud83d\\ude00y\"", "x😀y"},     // 😀 (astral, F0 9F 98 80)
-		{`u-escape uppercase hex`, "\"\\u00E9\"", "é"},            // hex A-F branch
+		{`u-escape ASCII`, "\"\\u0041\\u0042\"", "AB"},             // A,B
+		{`u-escape 2-byte`, "\"a\\u00e9b\"", "aéb"},                // é (C3 A9)
+		{`u-escape 3-byte`, "\"\\u20ac\"", "€"},                    // € (E2 82 AC)
+		{`u-escape boundary`, "\"\\u00ff\"", "ÿ"},                  // ÿ (C3 BF)
+		{`u-escape surrogate pair`, "\"x\\ud83d\\ude00y\"", "x😀y"}, // 😀 (astral, F0 9F 98 80)
+		{`u-escape uppercase hex`, "\"\\u00E9\"", "é"},             // hex A-F branch
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -67,13 +67,13 @@ func TestJSONStringReaderEscapes(t *testing.T) {
 // errBadJSONString, never panic (PLAN §3.6/§12.3).
 func TestJSONStringReaderErrors(t *testing.T) {
 	for _, in := range []string{
-		`"unterminated`,        // no closing quote
-		`"bad\xescape"`,        // \x is not a valid escape
-		`"\u12"`,               // short \u (hits the closing quote mid-hex)
-		`"\uZZZZ"`,             // non-hex digits
-		`"\uDC00"`,             // lone low surrogate
-		`"\uD83Dnotlow"`,       // high surrogate without a following \u low surrogate
-		`"\uD83DA"`,       // high surrogate followed by a NON-surrogate \u
+		`"unterminated`,  // no closing quote
+		`"bad\xescape"`,  // \x is not a valid escape
+		`"\u12"`,         // short \u (hits the closing quote mid-hex)
+		`"\uZZZZ"`,       // non-hex digits
+		`"\uDC00"`,       // lone low surrogate
+		`"\uD83Dnotlow"`, // high surrogate without a following \u low surrogate
+		`"\uD83DA"`,      // high surrogate followed by a NON-surrogate \u
 	} {
 		t.Run(in, func(t *testing.T) {
 			_, err := readJSONString(t, in)

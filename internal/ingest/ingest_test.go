@@ -290,10 +290,10 @@ func (f fakeStore) SaveAgentItem(sender, name, kind, uti string, r io.Reader) (s
 	_, _ = io.Copy(io.Discard, r)
 	return "", 0, f.saveErr
 }
-func (f fakeStore) EnqueueAgentText(sender, text string) error          { return nil }
-func (f fakeStore) LastPath() (string, bool)                            { return "", false }
-func (f fakeStore) Recv(ctx context.Context) (*wire.AgentItem, error)   { return nil, nil }
-func (f fakeStore) WaitForNext(ctx context.Context) (string, error)     { return "", nil }
+func (f fakeStore) EnqueueAgentText(sender, text string) error        { return nil }
+func (f fakeStore) LastPath() (string, bool)                          { return "", false }
+func (f fakeStore) Recv(ctx context.Context) (*wire.AgentItem, error) { return nil, nil }
+func (f fakeStore) WaitForNext(ctx context.Context) (string, error)   { return "", nil }
 
 // TestPathEscapeMapsGeneric asserts a sanitize.ErrPathEscape from the store maps to
 // the generic ingest.ErrPathEscape (→ 500, never echoing the path, §3.9/§3.11).

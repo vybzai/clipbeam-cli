@@ -234,7 +234,7 @@ func TestWaitTimeout204(t *testing.T) {
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, h.baseURL+"/wait", nil)
 	req.Header.Set(tokenHeader, testToken)
 	_, err := http.DefaultClient.Do(req)
-	// The client context fires first (no save happens), so the request is cancelled —
+	// The client context fires first (no save happens), so the request is canceled —
 	// the assertion is that this terminates promptly (no hang) rather than a specific
 	// status; a deadline-exceeded error is the expected client-side outcome.
 	if err == nil {

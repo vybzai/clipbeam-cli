@@ -37,7 +37,7 @@ func listenUnixSocket(path string) (net.Listener, error) {
 		if !ok {
 			return nil, fmt.Errorf("clipbeam: cannot stat existing socket %q", path)
 		}
-		if uint32(st.Uid) != uint32(os.Getuid()) {
+		if st.Uid != uint32(os.Getuid()) {
 			return nil, fmt.Errorf("clipbeam: refusing to bind socket %q owned by uid %d (not %d)", path, st.Uid, os.Getuid())
 		}
 		if err := os.Remove(path); err != nil {

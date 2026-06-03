@@ -8,12 +8,12 @@ import "strings"
 // from a leading [clipbeam:cid=<uuid>] in the text body (PLAN §8.6; default off — when
 // the convention is not present, Cid stays "").
 type recvItem struct {
-	Type   string
-	Sender string
-	Path   string // "" when absent
-	Text   string // "" when absent (the empty-text item is text:"")
-	HasText bool  // distinguishes an absent text: line from a present-but-empty one
-	Cid    string // extracted [clipbeam:cid=…] token, or "" (PLAN §8.6)
+	Type    string
+	Sender  string
+	Path    string // "" when absent
+	Text    string // "" when absent (the empty-text item is text:"")
+	HasText bool   // distinguishes an absent text: line from a present-but-empty one
+	Cid     string // extracted [clipbeam:cid=…] token, or "" (PLAN §8.6)
 }
 
 // parseRecvBody parses the labeled /recv body emitted by writeRecvBody / Swift

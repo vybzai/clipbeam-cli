@@ -8,7 +8,7 @@ import (
 
 // FuzzEnvelopeDecode throws arbitrary bytes at UnmarshalEnvelope and asserts it NEVER
 // panics — it either returns a valid Envelope or a clean error (PLAN §12.3). When it
-// decodes, re-marshalling the result must also not panic, and re-decoding the marshalled
+// decodes, re-marshaling the result must also not panic, and re-decoding the marshaled
 // bytes must succeed (a structural round-trip invariant: a value the decoder accepted and
 // the encoder produced must be re-decodable). Seeds are the real golden fixtures plus
 // adversarial inputs (truncated, deeply nested, huge numbers, lone surrogates, explicit

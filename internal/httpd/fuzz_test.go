@@ -71,7 +71,7 @@ func FuzzHTTPRequestParse(f *testing.F) {
 	f.Add([]byte("POST /clip HTTP/1.1\r\nHost: x\r\nContent-Length: notanumber\r\n\r\n"))
 	f.Add([]byte("POST /clip HTTP/1.1\r\nHost: x\r\nContent-Length: 999999999999999\r\n\r\n"))
 	f.Add([]byte("GET /health HTTP/1.1\r\nHost: x\r\nHost: y\r\nHost: z\r\n\r\n")) // duplicate headers
-	f.Add([]byte("GET /health HTTP/1.1\r\nHost: x")) // truncated (no terminating CRLF CRLF)
+	f.Add([]byte("GET /health HTTP/1.1\r\nHost: x"))                               // truncated (no terminating CRLF CRLF)
 	f.Add([]byte("\r\n\r\n"))
 	f.Add([]byte("GARBAGE NOT HTTP AT ALL"))
 	f.Add([]byte{0x00, 0x01, 0x02, 0xff, 0xfe}) // non-UTF8 / binary

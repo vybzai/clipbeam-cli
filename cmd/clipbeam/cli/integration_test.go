@@ -20,7 +20,7 @@ import (
 func newTestServer(t *testing.T) (*controlClient, store.ReceiveStore) {
 	t.Helper()
 	dir := t.TempDir()
-	sock := filepath.Join(dir, "clipbeam.sock")
+	sock := shortSock(t)
 
 	st, err := store.New(store.StoreConfig{
 		SaveDir:           filepath.Join(dir, "save"),

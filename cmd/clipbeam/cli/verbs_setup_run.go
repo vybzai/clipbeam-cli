@@ -403,7 +403,7 @@ func posixDir(p string) string {
 
 // shellQuotePosix single-quotes s for a POSIX remote shell (the remote is Linux/macOS).
 // It mirrors shellQuote but is named to make the remote-side intent explicit. Embedded
-// single quotes use the '\'' idiom.
+// single quotes use the '\” idiom.
 func shellQuotePosix(s string) string {
 	return shellQuote(s)
 }

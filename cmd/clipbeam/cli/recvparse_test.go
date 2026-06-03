@@ -76,9 +76,9 @@ func TestParseRecvBody_PathWithSpacesAndColons(t *testing.T) {
 // TestSplitFirstColon checks the first-colon split + single-leading-space drop.
 func TestSplitFirstColon(t *testing.T) {
 	cases := []struct {
-		line       string
-		wantLabel  string
-		wantValue  string
+		line      string
+		wantLabel string
+		wantValue string
 	}{
 		{"type: image", "type", "image"},
 		{"text: a:b:c", "text", "a:b:c"},

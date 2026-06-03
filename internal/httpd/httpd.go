@@ -90,7 +90,7 @@ func New(opts Options) *Server {
 	return s
 }
 
-// Serve binds per the configured ListenKind and serves until ctx is cancelled.
+// Serve binds per the configured ListenKind and serves until ctx is canceled.
 // For ListenTailscale/ListenLoopbackTCP it uses dualStackListenConfig so a single
 // [::]:port bind serves IPv4+IPv6 (IPV6_V6ONLY cleared, PLAN §3.3). For
 // ListenUnixSocket it binds the 0600 socket with stale-socket + uid-ownership

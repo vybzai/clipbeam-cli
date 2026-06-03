@@ -72,7 +72,7 @@ archives:
       - SECURITY*
       - PROTOCOL*
 
-checksums:
+checksum:
   name_template: checksums.txt
   algorithm: sha256
 

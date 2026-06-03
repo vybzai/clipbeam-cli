@@ -25,8 +25,14 @@ linters:
   settings:
     revive:
       rules:
+        # Keep exported-godoc discipline, but allow descriptive names like
+        # ingest.IngestItem / store.StoreConfig (renaming to ingest.Item would
+        # collide with wire.Item and read worse). disableStutteringCheck turns
+        # off only the stutter sub-check, not the godoc requirement.
         - name: exported
           disabled: false
+          arguments:
+            - disableStutteringCheck
     misspell:
       locale: US
   exclusions:

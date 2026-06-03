@@ -61,14 +61,14 @@ func (o out) diag(format string, args ...any) {
 	if o.quiet {
 		return
 	}
-	fmt.Fprintf(o.stderr, format+"\n", args...)
+	_, _ = fmt.Fprintf(o.stderr, format+"\n", args...)
 }
 
 // trace writes a verbose-only diagnostic line to stderr (PLAN §8.1: --verbose adds a
 // stderr trace). Suppressed unless --verbose, and always suppressed under --quiet.
 func (o out) trace(format string, args ...any) {
 	if o.verbose && !o.quiet {
-		fmt.Fprintf(o.stderr, format+"\n", args...)
+		_, _ = fmt.Fprintf(o.stderr, format+"\n", args...)
 	}
 }
 

@@ -44,7 +44,7 @@ func generateSkillMarkdown(doc schemaDoc) string {
 		if args == "" {
 			args = "-"
 		}
-		b.WriteString(fmt.Sprintf("| `%s` | %s | %s |\n", c.Name, args, escapePipes(c.Summary)))
+		fmt.Fprintf(&b, "| `%s` | %s | %s |\n", c.Name, args, escapePipes(c.Summary))
 	}
 	b.WriteString("\n")
 
@@ -72,7 +72,7 @@ func generateSkillMarkdown(doc schemaDoc) string {
 	b.WriteString("| Code | Meaning | Provenance |\n")
 	b.WriteString("|------|---------|------------|\n")
 	for _, e := range doc.ExitCodes {
-		b.WriteString(fmt.Sprintf("| %d | %s | %s |\n", e.Code, escapePipes(e.Meaning), escapePipes(e.Provenance)))
+		fmt.Fprintf(&b, "| %d | %s | %s |\n", e.Code, escapePipes(e.Meaning), escapePipes(e.Provenance))
 	}
 	b.WriteString("\n")
 
@@ -98,7 +98,7 @@ func generateSkillMarkdown(doc schemaDoc) string {
 
 	b.WriteString("## Environment variables\n")
 	for _, e := range doc.Env {
-		b.WriteString(fmt.Sprintf("- `%s` — %s\n", e.Name, e.Desc))
+		fmt.Fprintf(&b, "- `%s` — %s\n", e.Name, e.Desc)
 	}
 	b.WriteString("\n")
 

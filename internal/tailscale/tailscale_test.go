@@ -47,15 +47,15 @@ func TestParseFullStatus(t *testing.T) {
 // malformed type still must not panic — it yields [].
 func TestParseShapeDriftNeverPanics(t *testing.T) {
 	cases := [][]byte{
-		[]byte(`{}`),                                  // empty object
-		[]byte(`{"Self":null,"Peer":null}`),           // null members
-		[]byte(`{"Self":{}}`),                         // self with no fields
-		[]byte(`{"Peer":{"k":{}}}`),                   // peer with no fields
-		[]byte(`{"Self":{"TailscaleIPs":null}}`),      // null IPs slice
-		[]byte(`{"Self":{"Online":"yes"}}`),           // wrong type → unmarshal error → []
-		[]byte(`not json at all`),                     // garbage
-		[]byte(``),                                    // empty
-		[]byte(`{"Self":{"HostName":123}}`),           // wrong type for string
+		[]byte(`{}`),                             // empty object
+		[]byte(`{"Self":null,"Peer":null}`),      // null members
+		[]byte(`{"Self":{}}`),                    // self with no fields
+		[]byte(`{"Peer":{"k":{}}}`),              // peer with no fields
+		[]byte(`{"Self":{"TailscaleIPs":null}}`), // null IPs slice
+		[]byte(`{"Self":{"Online":"yes"}}`),      // wrong type → unmarshal error → []
+		[]byte(`not json at all`),                // garbage
+		[]byte(``),                               // empty
+		[]byte(`{"Self":{"HostName":123}}`),      // wrong type for string
 	}
 	for i, data := range cases {
 		func() {

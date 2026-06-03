@@ -321,11 +321,12 @@ case ":${PATH}:" in
   *)
     SHELL_NAME=$(basename "${SHELL:-sh}")
     case "$SHELL_NAME" in
-      zsh)  RC="~/.zshrc" ;;
-      bash) RC="~/.bashrc" ;;
-      *)    RC="~/.profile" ;;
+      zsh)  RC="$HOME/.zshrc" ;;
+      bash) RC="$HOME/.bashrc" ;;
+      *)    RC="$HOME/.profile" ;;
     esac
     warn "${BIN_DIR} is not on your PATH. Add it for your shell (${SHELL_NAME}):"
+    # shellcheck disable=SC2016  # the single-quoted $PATH is intentional: we print a literal line for the user to paste
     printf '\n  echo '\''export PATH="%s:$PATH"'\'' >> %s\n\n' "$BIN_DIR" "$RC" >&2
     ;;
 esac

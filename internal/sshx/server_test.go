@@ -367,8 +367,7 @@ func TestForwardEndToEnd(t *testing.T) {
 // TestForwardStreamLocalEndToEnd exercises the direct-streamlocal (unix socket) forward
 // path (§5.1 0b unix socket) over the in-process server.
 func TestForwardStreamLocalEndToEnd(t *testing.T) {
-	dir := t.TempDir()
-	sock := filepath.Join(dir, "clipbeam.sock")
+	sock := shortSock(t)
 	backendLn, err := net.Listen("unix", sock)
 	if err != nil {
 		t.Fatal(err)

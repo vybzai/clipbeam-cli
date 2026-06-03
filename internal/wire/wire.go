@@ -28,9 +28,9 @@ type Item struct {
 // Channel is an optional routing channel: nil or "clipboard" → the clipboard
 // channel; "agent" → the agent inbox channel (PLAN §3.4, Models.swift:25-30).
 type Envelope struct {
-	Version int    `json:"version"`
-	Sender  string `json:"sender"`
-	Items   []Item `json:"items"`
+	Version int     `json:"version"`
+	Sender  string  `json:"sender"`
+	Items   []Item  `json:"items"`
 	Channel *string `json:"channel,omitempty"`
 }
 

@@ -234,11 +234,11 @@ func TestResolvedSaveDirDefault(t *testing.T) {
 func TestExpandTilde(t *testing.T) {
 	home := withHome(t)
 	cases := map[string]string{
-		"~":            home,
-		"~/x":          filepath.Join(home, "x"),
-		"/abs/path":    "/abs/path",
-		"relative/x":   "relative/x", // not expanded; only leading ~ is
-		"~user/notme":  "~user/notme",
+		"~":           home,
+		"~/x":         filepath.Join(home, "x"),
+		"/abs/path":   "/abs/path",
+		"relative/x":  "relative/x", // not expanded; only leading ~ is
+		"~user/notme": "~user/notme",
 	}
 	for in, want := range cases {
 		got, err := expandTilde(in)

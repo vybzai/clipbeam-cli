@@ -207,7 +207,7 @@ func remoteIngestCommand(remoteBin string) string {
 
 // shellQuote single-quotes s for safe interpolation into the remote command string
 // (paths may contain spaces; setup records absolute paths). Embedded single quotes are
-// escaped via the '\'' idiom.
+// escaped via the '\” idiom.
 func shellQuote(s string) string {
 	out := make([]byte, 0, len(s)+2)
 	out = append(out, '\'')

@@ -35,7 +35,7 @@ func TestUnixSocketTokenFreeControl(t *testing.T) {
 	}
 	cfg := config.DefaultConfig()
 	cfg.SaveDir = saveDir
-	sockPath := filepath.Join(dir, "clipbeam.sock")
+	sockPath := shortSock(t)
 
 	srv := New(Options{
 		Config: cfg, Token: testToken, Store: st,

@@ -34,12 +34,12 @@ func TestDecodedLength(t *testing.T) {
 		want int
 	}{
 		{"", 0},
-		{"QQ==", 1},      // "A"
-		{"QUI=", 2},      // "AB"
-		{"QUJD", 3},      // "ABC"
-		{"QUJDRA==", 4},  // "ABCD"
-		{"QU\nJD", 3},    // whitespace ignored
-		{"=", 0},         // clamp ≥ 0
+		{"QQ==", 1},     // "A"
+		{"QUI=", 2},     // "AB"
+		{"QUJD", 3},     // "ABC"
+		{"QUJDRA==", 4}, // "ABCD"
+		{"QU\nJD", 3},   // whitespace ignored
+		{"=", 0},        // clamp ≥ 0
 	}
 	for _, c := range cases {
 		if got := DecodedLength(c.b64); got != c.want {

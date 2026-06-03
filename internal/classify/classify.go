@@ -107,7 +107,7 @@ func isTailnet(ip netip.Addr) bool {
 
 // RemoteEndpoint extracts the bare host from a net.Addr-style "host:port" or a raw
 // host string, stripping brackets and a trailing :port where unambiguous. It is the
-// Go analogue of Swift remoteEndpoint(of:)+hostString(from:) (PLAN §6.2): callers
+// Go analog of Swift remoteEndpoint(of:)+hostString(from:) (PLAN §6.2): callers
 // pass an *http.Request RemoteAddr or a forwarded socket address. Zone ids are kept
 // here and stripped by parseIP.
 func RemoteEndpoint(remoteAddr string) string {

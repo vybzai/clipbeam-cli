@@ -1,7 +1,7 @@
 // Package store defines the ReceiveStore boundary and its skeleton implementation:
 // the clipboard channel (disk save / last_path / recents) and the agent channel
 // (in-memory FIFO inbox + long-poll waiters). The long-poll primitives are the
-// per-waiter buffered chan + sync.Mutex model (PLAN §3.10), the Go analogue of
+// per-waiter buffered chan + sync.Mutex model (PLAN §3.10), the Go analog of
 // Swift ReceiveStore's per-waiter boxed continuations.
 package store
 
@@ -13,7 +13,7 @@ import (
 )
 
 // ReceiveStore is the receive-side state boundary, implemented by the concrete
-// store (M1b) and consumed by the httpd handlers (M1c). It is the Go analogue of the
+// store (M1b) and consumed by the httpd handlers (M1c). It is the Go analog of the
 // Swift ClipReceiver protocol (Server.swift:204) split into its two channels.
 //
 // The clipboard channel writes disk + last_path + recents (PLAN §7.2); the agent

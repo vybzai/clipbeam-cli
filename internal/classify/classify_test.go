@@ -47,11 +47,11 @@ func TestClassifyEmptyPeerNeverMatchesPeer(t *testing.T) {
 // TestRemoteEndpoint covers host extraction from RemoteAddr-style strings.
 func TestRemoteEndpoint(t *testing.T) {
 	cases := map[string]string{
-		"127.0.0.1:54321":  "127.0.0.1",
-		"[::1]:54321":      "::1",
-		"[fe80::1%eth0]":   "fe80::1%eth0",
-		"100.73.230.15":    "100.73.230.15",
-		"::1":              "::1", // bare IPv6, multiple colons, untouched
+		"127.0.0.1:54321": "127.0.0.1",
+		"[::1]:54321":     "::1",
+		"[fe80::1%eth0]":  "fe80::1%eth0",
+		"100.73.230.15":   "100.73.230.15",
+		"::1":             "::1", // bare IPv6, multiple colons, untouched
 	}
 	for in, want := range cases {
 		if got := RemoteEndpoint(in); got != want {

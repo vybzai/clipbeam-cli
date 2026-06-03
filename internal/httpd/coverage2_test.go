@@ -145,13 +145,13 @@ func TestClipNullBytesB64Is400(t *testing.T) {
 // to a 400, never panic.
 func TestClipMalformedShapes(t *testing.T) {
 	bodies := map[string]string{
-		"non-object root":       `[1,2,3]`,
-		"bad top separator":     `{"version":1 "sender":"t"}`,
-		"truncated items":       `{"version":1,"sender":"t","items":[{"kind":"text"`,
-		"bad item separator":    `{"version":1,"sender":"t","items":[{"kind":"text","text":"a"} {"kind":"text"}]}`,
-		"non-object item":    `{"version":1,"sender":"t","items":["notanobject"]}`,
-		"non-string key":     `{1:2}`,
-		"missing items":      `{"version":1,"sender":"t"}`,
+		"non-object root":     `[1,2,3]`,
+		"bad top separator":   `{"version":1 "sender":"t"}`,
+		"truncated items":     `{"version":1,"sender":"t","items":[{"kind":"text"`,
+		"bad item separator":  `{"version":1,"sender":"t","items":[{"kind":"text","text":"a"} {"kind":"text"}]}`,
+		"non-object item":     `{"version":1,"sender":"t","items":["notanobject"]}`,
+		"non-string key":      `{1:2}`,
+		"missing items":       `{"version":1,"sender":"t"}`,
 		"unterminated string": `{"version":1,"sender":"t","items":[{"kind":"text","text":"unterminated`,
 	}
 	for name, body := range bodies {
@@ -282,7 +282,7 @@ func TestServeProductionFullPath(t *testing.T) {
 	}
 	cfg := config.DefaultConfig()
 	cfg.SaveDir = saveDir
-	sock := filepath.Join(dir, "clipbeam.sock")
+	sock := shortSock(t)
 	srv := New(Options{
 		Config: cfg, Token: testToken, Store: st,
 		Listen: ListenUnixSocket, SocketPath: sock, AppVersion: "test",

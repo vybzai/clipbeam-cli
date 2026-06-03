@@ -52,7 +52,7 @@ func (s *receiveStore) SaveClipboardItem(name, kind, uti string, r io.Reader) (s
 // NOT count toward maxBytes (PLAN §3.8, §7.2). The sidecar name is the sanitized
 // clipbeam-<UTC>.txt; written is its UTF-8 byte count.
 func (s *receiveStore) SaveClipboardText(text string) (string, bool, int64, error) {
-	if !(s.cfg.SaveTextToDisk || len(text) > s.cfg.LongTextThreshold) {
+	if !s.cfg.SaveTextToDisk && len(text) <= s.cfg.LongTextThreshold {
 		return "", false, 0, nil
 	}
 	// The sidecar rides the SAME save pipeline (sanitize + atomic + collision) as a

@@ -221,7 +221,7 @@ func truncateBytes(s string, maxBytes int) string {
 	}
 	b := []byte(s)[:maxBytes]
 	for len(b) > 0 {
-		if r, size := utf8.DecodeLastRune(b); !(r == utf8.RuneError && size <= 1) {
+		if r, size := utf8.DecodeLastRune(b); r != utf8.RuneError || size > 1 {
 			break
 		}
 		b = b[:len(b)-1]
