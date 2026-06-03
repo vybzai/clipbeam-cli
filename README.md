@@ -38,8 +38,12 @@ wire protocol byte-for-byte, so the macOS `ClipBeam.app` and the `clipbeam` CLI
 
 ## Demo
 
-> _A ≤20s asciinema/GIF goes here: drag an image on the laptop → `clipbeam send` →
-> the box's agent reads the printed path. (TODO: record before launch.)_
+![clipbeam CLI tour](docs/demo.gif)
+
+> A tour of the agent-first surface (rendered from [`docs/demo.tape`](docs/demo.tape)
+> with [vhs](https://github.com/charmbracelet/vhs)). The full story — drag an image
+> on the laptop → `clipbeam send` → the box's agent reads `clipbeam last` — is a
+> ~30-second flow once you've `clipbeam setup`'d a box.
 
 ## Install
 
