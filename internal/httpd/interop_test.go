@@ -92,6 +92,9 @@ func leavesIn(t *testing.T, dir string) []string {
 		if strings.HasPrefix(n, ".clipbeam-") {
 			continue // streaming-decode scratch / reservation temp
 		}
+		if e.IsDir() && n == "journal" {
+			continue // the disk-backed agent journal (metadata, not a payload leaf)
+		}
 		out = append(out, n)
 	}
 	return out

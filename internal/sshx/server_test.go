@@ -1,6 +1,7 @@
 package sshx
 
 import (
+	"bytes"
 	"crypto/ed25519"
 	"crypto/rand"
 	"fmt"
@@ -27,10 +28,23 @@ type testServer struct {
 	dialFn   func(network, addr string) (net.Conn, error)
 	wg       sync.WaitGroup
 	closeOne sync.Once
+	// authorizedKey, when non-nil, restricts the PublicKeyCallback to accept ONLY this
+	// public key (by marshaled bytes). When nil the server accepts ANY key (the default,
+	// permissive harness). A restrictive server is required to PROVE the empty-agent
+	// file-key fallback in TestMergedPublicKeyEmptyAgentFallsBackToFileKey — a permissive
+	// callback would pass even with the dedupe bug.
+	authorizedKey ssh.PublicKey
 }
 
-// newTestServer starts a server on 127.0.0.1:0 and returns it plus its host public key.
+// newTestServer starts a server on 127.0.0.1:0 that accepts ANY public key.
 func newTestServer(t *testing.T) *testServer {
+	t.Helper()
+	return newTestServerWithAuthorizedKey(t, nil)
+}
+
+// newTestServerWithAuthorizedKey starts a server on 127.0.0.1:0 whose PublicKeyCallback
+// accepts ONLY authorizedKey (when non-nil), else any key (when nil).
+func newTestServerWithAuthorizedKey(t *testing.T, authorizedKey ssh.PublicKey) *testServer {
 	t.Helper()
 	_, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
@@ -44,7 +58,7 @@ func newTestServer(t *testing.T) *testServer {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := &testServer{ln: ln, signer: signer}
+	s := &testServer{ln: ln, signer: signer, authorizedKey: authorizedKey}
 	s.wg.Add(1)
 	go s.serve()
 	t.Cleanup(s.Close)
@@ -78,7 +92,12 @@ func (s *testServer) serve() {
 
 func (s *testServer) handleConn(nc net.Conn) {
 	cfg := &ssh.ServerConfig{
-		PublicKeyCallback: func(ssh.ConnMetadata, ssh.PublicKey) (*ssh.Permissions, error) {
+		PublicKeyCallback: func(_ ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
+			if s.authorizedKey != nil {
+				if !bytes.Equal(key.Marshal(), s.authorizedKey.Marshal()) {
+					return nil, fmt.Errorf("unauthorized key")
+				}
+			}
 			return &ssh.Permissions{}, nil
 		},
 	}
@@ -205,16 +224,17 @@ func newClientForServer(t *testing.T, s *testServer) *client {
 // PublicKeys auth path without touching ~/.ssh).
 type fixedKeyAuth struct{ t *testing.T }
 
-func (a *fixedKeyAuth) methods(Target) ([]ssh.AuthMethod, error) {
+func (a *fixedKeyAuth) methods(Target) ([]ssh.AuthMethod, func(), error) {
+	noop := func() {}
 	_, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
-		return nil, err
+		return nil, noop, err
 	}
 	signer, err := ssh.NewSignerFromKey(priv)
 	if err != nil {
-		return nil, err
+		return nil, noop, err
 	}
-	return []ssh.AuthMethod{ssh.PublicKeys(signer)}, nil
+	return []ssh.AuthMethod{ssh.PublicKeys(signer)}, noop, nil
 }
 
 // TestExecEndToEnd is the required in-process gate (PLAN §12): a real ssh server

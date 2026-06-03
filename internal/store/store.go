@@ -42,11 +42,18 @@ type ReceiveStore interface {
 
 	// SaveAgentItem streams one agent-channel image/file item from r to the agent
 	// inbox (dir 0700, files 0600) and enqueues an AgentItem carrying its path.
-	// Returns the absolute saved path and the decoded byte count (PLAN §7.5).
+	// Returns the absolute saved path and the decoded byte count (PLAN §7.5). The
+	// payload file is also recorded in the durable on-disk journal ONLY when the store
+	// was built with JournalAgentItems=true (the daemonless `clipbeam ingest` verb,
+	// fix [F]); the serve daemon builds the store WITHOUT that flag, so it stays
+	// in-memory-FIFO-only with no journal write (no pileup, no double-delivery, H1/H2).
 	SaveAgentItem(sender, name, kind, uti string, r io.Reader) (path string, written int64, err error)
 
-	// EnqueueAgentText enqueues an agent-channel text item in memory only — never
-	// written to disk (PLAN §7.5).
+	// EnqueueAgentText enqueues an agent-channel text item in the in-memory FIFO. It is
+	// ALSO written to the durable on-disk journal ONLY when the store was built with
+	// JournalAgentItems=true (the daemonless `clipbeam ingest` verb, fix [F]); the serve
+	// daemon builds the store WITHOUT that flag, so text stays in memory only — never
+	// written to disk (PLAN §7.5; no plaintext retention, no double-delivery, H1/H2).
 	EnqueueAgentText(sender, text string) error
 
 	// LastPath returns the most-recently-saved clipboard path, or ("", false) if
@@ -56,6 +63,12 @@ type ReceiveStore interface {
 	// Recv dequeues exactly one agent FIFO item, or parks until ctx is done
 	// (timeout → nil item). Powers GET /recv (PLAN §3.10).
 	Recv(ctx context.Context) (*wire.AgentItem, error)
+
+	// DrainAgentDisk atomically claims and returns the OLDEST durable agent-channel
+	// journal record (FIFO), or a nil item when the journal is empty. It is a ONE-SHOT
+	// disk drain (NOT a long-poll) used by the daemonless `clipbeam recv` fallback when
+	// no daemon is reachable (fix [F]); it is exactly-once across concurrent drainers.
+	DrainAgentDisk(ctx context.Context) (*wire.AgentItem, error)
 
 	// WaitForNext parks until the next clipboard path is saved or ctx is done
 	// (latest-wins, not a queue). Powers the fixed-120 s GET /wait (PLAN §3.10).
@@ -81,4 +94,15 @@ type StoreConfig struct {
 	SaveTextToDisk    bool
 	LongTextThreshold int
 	MaxBytes          int
+
+	// JournalAgentItems opts the store into the durable on-disk agent journal (fix [F]).
+	// It is set TRUE only by the one-shot, daemonless `clipbeam ingest` verb (a
+	// short-lived process whose in-memory FIFO is discarded on exit, so a later
+	// daemonless `clipbeam recv` — a DIFFERENT process — drains the journal instead).
+	// It is FALSE for the serve daemon and any HTTP /clip,/agent-send handler path: the
+	// daemon is the live consumer of its own in-memory FIFO via /recv, so it must NOT
+	// also write the journal (that would grow unbounded with retained plaintext, H1, and
+	// double-deliver to a later daemonless recv, H2). Default FALSE keeps the daemon
+	// path byte-for-byte its pre-changeset in-memory-only behavior.
+	JournalAgentItems bool
 }

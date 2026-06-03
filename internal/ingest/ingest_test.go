@@ -41,6 +41,29 @@ func bytesItem(name string, n int) IngestItem {
 	return IngestItem{Kind: KindImage, Name: name, Uti: "public.png", Channel: ChannelClipboard, Reader: strings.NewReader(strings.Repeat("x", n))}
 }
 
+// inboxPayloadCount counts saved payload leaves in an agent inbox, EXCLUDING the
+// disk-backed agent journal subdir and any streaming-decode scratch temp (fix [F]). The
+// cap/text-on-disk invariants are about payload files, not the journal metadata.
+func inboxPayloadCount(t *testing.T, inbox string) int {
+	t.Helper()
+	entries, err := os.ReadDir(inbox)
+	if err != nil {
+		return 0
+	}
+	n := 0
+	for _, e := range entries {
+		name := e.Name()
+		if e.IsDir() && name == "journal" {
+			continue
+		}
+		if strings.HasPrefix(name, ".clipbeam-") {
+			continue
+		}
+		n++
+	}
+	return n
+}
+
 // TestPerItemIncrementalCap asserts the write→add→check ordering: with maxBytes=10 and
 // three 4-byte items, item 1 (sum 4) and item 2 (sum 8) are written, item 3 (sum 12)
 // trips → ErrTooLarge, and items 1..2 REMAIN on disk (§3.8 — not a whole-envelope
@@ -140,8 +163,8 @@ func TestAgentTextWithinCapEnqueued(t *testing.T) {
 		t.Fatalf("resp = %+v, want saved:[] count:1 (text not on disk)", resp)
 	}
 	if _, statErr := os.Stat(inbox); statErr == nil {
-		if entries, _ := os.ReadDir(inbox); len(entries) != 0 {
-			t.Fatalf("agent text left %d files in inbox, want 0", len(entries))
+		if got := inboxPayloadCount(t, inbox); got != 0 {
+			t.Fatalf("agent text left %d payload files in inbox, want 0", got)
 		}
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 200_000_000)
@@ -294,6 +317,9 @@ func (f fakeStore) EnqueueAgentText(sender, text string) error        { return n
 func (f fakeStore) LastPath() (string, bool)                          { return "", false }
 func (f fakeStore) Recv(ctx context.Context) (*wire.AgentItem, error) { return nil, nil }
 func (f fakeStore) WaitForNext(ctx context.Context) (string, error)   { return "", nil }
+func (f fakeStore) DrainAgentDisk(ctx context.Context) (*wire.AgentItem, error) {
+	return nil, nil
+}
 
 // TestPathEscapeMapsGeneric asserts a sanitize.ErrPathEscape from the store maps to
 // the generic ingest.ErrPathEscape (→ 500, never echoing the path, §3.9/§3.11).

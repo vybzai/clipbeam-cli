@@ -238,7 +238,7 @@ func newSetupCmd() *cobra.Command {
 	f.StringVar(&opts.serve, "serve", "exec", "exec | socket | tcp | tailscale (default daemonless-exec)")
 	f.BoolVar(&opts.acceptNew, "accept-new-hostkey", false, "record an unknown host key non-interactively (TOFU)")
 	f.BoolVar(&opts.force, "force", false, "re-stream the binary even if the remote version matches")
-	f.BoolVar(&opts.fromRelease, "from-release", false, "fetch the remote binary via a remote-side curl|sh")
+	f.BoolVar(&opts.fromRelease, "from-release", false, "have the REMOTE box fetch the published installer over its own internet (inverts the default no-remote-egress; needs a released version)")
 	return cmd
 }
 

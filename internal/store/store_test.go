@@ -10,6 +10,30 @@ import (
 	"time"
 )
 
+// payloadLeafCount counts the saved payload leaves in an agent inbox, EXCLUDING the
+// disk-backed agent journal subdir and any streaming-decode scratch temp (fix [F]). The
+// "text never on disk as a payload" invariant is about payload files, not the journal
+// metadata.
+func payloadLeafCount(t *testing.T, inbox string) int {
+	t.Helper()
+	entries, err := os.ReadDir(inbox)
+	if err != nil {
+		return 0
+	}
+	n := 0
+	for _, e := range entries {
+		name := e.Name()
+		if e.IsDir() && name == "journal" {
+			continue
+		}
+		if strings.HasPrefix(name, ".clipbeam-") {
+			continue
+		}
+		n++
+	}
+	return n
+}
+
 // newTestStore builds a store over temp dirs with the given text policy.
 func newTestStore(t *testing.T, saveTextToDisk bool, longText int) (*receiveStore, string, string) {
 	t.Helper()
@@ -244,9 +268,10 @@ func TestAgentInboxModesAndEnqueue(t *testing.T) {
 	if err := s.EnqueueAgentText("peer", "just text"); err != nil {
 		t.Fatal(err)
 	}
-	entries, _ := os.ReadDir(inbox)
-	if len(entries) != 1 { // only the file item
-		t.Fatalf("inbox has %d entries, want 1 (text must not hit disk)", len(entries))
+	// Count only payload leaves, not the disk-backed agent journal subdir (fix [F]): the
+	// invariant under test is that agent TEXT is never written as a payload file.
+	if got := payloadLeafCount(t, inbox); got != 1 { // only the file item
+		t.Fatalf("inbox has %d payload entries, want 1 (text must not hit disk)", got)
 	}
 
 	// Drain FIFO: file item (with path) then text item (with text).

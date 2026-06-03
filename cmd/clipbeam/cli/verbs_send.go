@@ -77,8 +77,11 @@ func resolveTarget(spec string) (resolvedTarget, error) {
 	}
 
 	// An empty spec uses the default alias; a non-empty spec may name a saved alias OR
-	// be a literal user@host[:port] / tailnet address.
-	if alias, ok := aliases.Lookup(spec); ok {
+	// be a literal user@host[:port] / tailnet address. LookupSpec also matches a literal
+	// user@host[:port] / bare host against a saved SSH alias's recorded host, so re-using
+	// the SAME spec passed to `clipbeam setup` resolves the recorded remoteBinPath (fix
+	// [D] completeness) instead of falling through to a bare `clipbeam ingest` (127).
+	if alias, ok := aliases.LookupSpec(spec); ok {
 		if alias.Transport == "tailscale" {
 			return tailscaleResolvedTarget(alias.PeerIP, cfg)
 		}
@@ -147,6 +150,12 @@ func aliasSpec(a config.Alias) string {
 	return a.SSHHost
 }
 
+// newSSHClient is the seam used to construct the in-process SSH client for the
+// daemonless-exec push (and the [C] release installer), so tests can inject a fake
+// Client/Session that captures the remote command without a real box. Production points
+// at sshx.NewClient; tests swap it and restore it via t.Cleanup.
+var newSSHClient = sshx.NewClient
+
 // pushCB01 dials the resolved target, execs the remote `clipbeam ingest` over SSH, and
 // streams a CB01 frame to its stdin, relaying the remote stdout (the saved absolute
 // path) as the deliverable (PLAN §5.1). It returns the number of items sent and the
@@ -159,7 +168,7 @@ func pushCB01(o out, rt resolvedTarget, channel string, items []sshx.CB01Item) (
 		return pushTailscale(o, rt, channel, items)
 	}
 
-	client, err := sshx.NewClient()
+	client, err := newSSHClient()
 	if err != nil {
 		return sendOutcome{}, sshNotReady(err)
 	}

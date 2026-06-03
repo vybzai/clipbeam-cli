@@ -152,8 +152,12 @@ func ingestClipboard(items []IngestItem, st store.ReceiveStore, maxBytes int) (w
 
 // ingestAgent implements receiveAgent (PLAN §7.5, Swift performReceiveAgent). Every
 // item is counted (including text — the asymmetry vs the clipboard channel, §3.8);
-// image/file items are saved to the agent inbox and enqueued by path, text is enqueued
-// in memory only and never written to disk.
+// image/file items are saved to the agent inbox and enqueued by path. Agent text is
+// always enqueued in the in-memory FIFO; whether it is ALSO written to the durable
+// on-disk journal depends on how the store was built: the daemonless `clipbeam ingest`
+// verb opts in (so a later separate-process `clipbeam recv` can drain it from disk, fix
+// [F]), while the serve daemon stays in-memory only — text is never written to disk on
+// the daemon path (no plaintext retention, no double-delivery, H1/H2).
 func ingestAgent(items []IngestItem, st store.ReceiveStore, maxBytes int) (wire.ClipResponse, error) {
 	var savedPaths []string
 	var total int64

@@ -71,6 +71,81 @@ func TestAliasLookupDefault(t *testing.T) {
 	}
 }
 
+// TestLookupSpecHostFallback asserts LookupSpec resolves a saved SSH alias when the data
+// verb re-uses the SAME literal user@host[:port] / bare host spec that `clipbeam setup`
+// was given — so the recorded absolute remoteBinPath is used instead of a bare
+// `clipbeam ingest` that fails 127 under a minimal non-login SSH-exec PATH (fix [D]
+// completeness). The alias is keyed by the bare host (aliasName strips user@/:port), so a
+// later `send file root@host` must still find it.
+func TestLookupSpecHostFallback(t *testing.T) {
+	s := AliasStore{
+		Aliases: []Alias{
+			{Name: "box", Transport: "ssh", SSHUser: "root", SSHHost: "box", SSHPort: 22,
+				RemoteBinPath: "/root/.local/bin/clipbeam", Default: true},
+			{Name: "tailbox", Transport: "tailscale", PeerIP: "100.64.0.9"},
+		},
+		DefaultAlias: "box",
+	}
+
+	cases := []struct {
+		name      string
+		spec      string
+		wantOK    bool
+		wantAlias string
+	}{
+		{"exact name", "box", true, "box"},
+		{"empty uses default", "", true, "box"},
+		{"literal user@host (the setup spec)", "root@box", true, "box"},
+		{"bare host", "box", true, "box"}, // same as the name here; explicit for intent
+		{"user@host:port matching", "root@box:22", true, "box"},
+		{"wrong user misses", "deploy@box", false, ""},
+		{"wrong port misses", "root@box:2222", false, ""},
+		{"unknown host misses", "root@other", false, ""},
+		{"tailnet IP does not match an ssh alias host", "100.64.0.9", false, ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			a, ok := s.LookupSpec(c.spec)
+			if ok != c.wantOK {
+				t.Fatalf("LookupSpec(%q) ok=%v, want %v (alias %+v)", c.spec, ok, c.wantOK, a)
+			}
+			if ok {
+				if a.Name != c.wantAlias {
+					t.Errorf("LookupSpec(%q) alias=%q, want %q", c.spec, a.Name, c.wantAlias)
+				}
+				if a.Transport == "ssh" && a.RemoteBinPath == "" {
+					t.Errorf("LookupSpec(%q) resolved ssh alias with empty RemoteBinPath — the [D] fix needs the recorded abs path", c.spec)
+				}
+			}
+		})
+	}
+}
+
+// TestParseSSHSpec asserts the literal-spec parser splits user@host[:port] correctly and
+// leaves an IPv6 colon run (more than one ':') untouched so only a single trailing :port
+// is stripped.
+func TestParseSSHSpec(t *testing.T) {
+	cases := []struct {
+		spec       string
+		user, host string
+		port       int
+	}{
+		{"host", "", "host", 0},
+		{"root@host", "root", "host", 0},
+		{"root@host:22", "root", "host", 22},
+		{"host:2222", "", "host", 2222},
+		{"root@host:0", "root", "host:0", 0},               // invalid port → not stripped
+		{"root@host:notaport", "root", "host:notaport", 0}, // non-numeric → not stripped
+		{"::1", "", "::1", 0},                              // IPv6 run left intact
+	}
+	for _, c := range cases {
+		u, h, p := parseSSHSpec(c.spec)
+		if u != c.user || h != c.host || p != c.port {
+			t.Errorf("parseSSHSpec(%q) = (%q,%q,%d), want (%q,%q,%d)", c.spec, u, h, p, c.user, c.host, c.port)
+		}
+	}
+}
+
 // TestLoadAliasesCorrupt asserts a corrupt file is a hard error (a data verb must not
 // silently lose a saved default).
 func TestLoadAliasesCorrupt(t *testing.T) {

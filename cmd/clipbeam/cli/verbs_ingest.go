@@ -43,6 +43,13 @@ func runIngest(o out) error {
 		SaveTextToDisk:    cfg.SaveTextToDisk,
 		LongTextThreshold: cfg.LongTextThreshold,
 		MaxBytes:          maxBytesOf(cfg),
+		// `clipbeam ingest` is the ONE-SHOT daemonless writer: its in-memory FIFO dies with
+		// this process, so an agent item must be journaled to disk for a later daemonless
+		// `clipbeam recv` (a different process) to drain it (fix [F]). This is the ONLY store
+		// construction that opts into the journal; the serve daemon does NOT (it is the live
+		// /recv consumer of its own in-memory FIFO — journaling there would pile up plaintext
+		// (H1) and double-deliver (H2)).
+		JournalAgentItems: true,
 	})
 	if err != nil {
 		return coded(ExitGeneric, err)

@@ -96,14 +96,34 @@ func (s *receiveStore) SaveAgentItem(sender, name, kind, uti string, r io.Reader
 	}
 	p := path
 	s.agent.enqueue(wire.AgentItem{Type: atype, Sender: sender, Path: &p})
+	// Write a durable journal record ONLY on the daemonless `clipbeam ingest` verb path
+	// (JournalAgentItems=true), so a separate-process daemonless recv can drain it from
+	// disk (fix [F]). The serve daemon builds the store WITHOUT this flag: it is the live
+	// consumer of its own in-memory FIFO via /recv, so it MUST NOT also journal (that
+	// would pile up retained plaintext, H1, and double-deliver to a later daemonless
+	// recv, H2). A journal-write failure on the ingest path is fatal so a "saved" item is
+	// never silently undeliverable.
+	if s.cfg.JournalAgentItems {
+		if jerr := writeAgentJournal(s.cfg.AgentInboxDir, atype, sender, path, false, ""); jerr != nil {
+			return "", 0, jerr
+		}
+	}
 	return path, n, nil
 }
 
-// EnqueueAgentText enqueues an in-memory-only agent text item — never written to disk
-// (PLAN §7.5).
+// EnqueueAgentText enqueues an agent text item in the in-memory FIFO for the live
+// daemon's /recv long-poll. It is ALSO persisted as a durable journal record ONLY on the
+// daemonless `clipbeam ingest` verb path (JournalAgentItems=true) so a separate-process
+// daemonless recv can drain it from disk (fix [F]); the serve daemon builds the store
+// WITHOUT the flag, so its text stays in memory only — no plaintext retention (H1), no
+// double-delivery (H2). hasText=true is recorded explicitly so a present-but-empty text
+// item (text:"") survives distinct from an absent text.
 func (s *receiveStore) EnqueueAgentText(sender, text string) error {
 	t := text
 	s.agent.enqueue(wire.AgentItem{Type: "text", Sender: sender, Text: &t})
+	if s.cfg.JournalAgentItems {
+		return writeAgentJournal(s.cfg.AgentInboxDir, "text", sender, "", true, text)
+	}
 	return nil
 }
 
@@ -200,6 +220,19 @@ func reserve(dest string) error {
 func exists(path string) bool {
 	_, err := os.Lstat(path)
 	return err == nil
+}
+
+// ReadLastPath reads the persisted last_path file (the bare absolute path, no trailing
+// newline) and returns (path, true) when present, else ("", false). It is the daemonless
+// on-disk fallback for `clipbeam last`/`wait` when no daemon is reachable (fix [E]):
+// FinishClipboard already persists last_path on disk (concrete.go), so the read verbs can
+// recover it without the in-memory daemon. An empty/missing/unreadable file is ("",false).
+func ReadLastPath(file string) (string, bool) {
+	p := loadLastPath(file)
+	if p == "" {
+		return "", false
+	}
+	return p, true
 }
 
 // loadLastPath reads the persisted last_path (raw bytes, no trailing newline), or ""

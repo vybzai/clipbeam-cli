@@ -132,10 +132,13 @@ func (c *client) ssh(t Target) (*ssh.Client, error) {
 	if user == "" {
 		user = os.Getenv("USER")
 	}
-	authMethods, err := c.auth.methods(t)
+	authMethods, cleanup, err := c.auth.methods(t)
 	if err != nil {
 		return nil, err
 	}
+	// The agent signers are only needed through the handshake; close the agent socket conn
+	// (if any) once ssh.Dial returns, success or failure — no per-process fd leak.
+	defer cleanup()
 	cfg := &ssh.ClientConfig{
 		User:            user,
 		Auth:            authMethods,

@@ -3,7 +3,6 @@ package ingest
 import (
 	"errors"
 	"io"
-	"os"
 	"strings"
 	"testing"
 
@@ -49,9 +48,9 @@ func TestAgentFileSaveThenTextMidBatchCap(t *testing.T) {
 		t.Fatalf("agent mid-batch err = %v, want ErrTooLarge", err)
 	}
 	// The file item (item 1) is on the inbox FIFO/disk; the text trip did not remove it.
-	entries, _ := os.ReadDir(inbox)
-	if len(entries) != 1 {
-		t.Fatalf("inbox has %d files after a text trip on item 2, want 1 (the file stays)", len(entries))
+	// Count payload leaves only (the disk-backed agent journal subdir is excluded, fix [F]).
+	if got := inboxPayloadCount(t, inbox); got != 1 {
+		t.Fatalf("inbox has %d payload files after a text trip on item 2, want 1 (the file stays)", got)
 	}
 }
 

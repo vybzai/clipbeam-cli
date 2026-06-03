@@ -19,14 +19,14 @@ import (
 // record the alias. Every step's diagnostics go to stderr; the final deliverable
 // (the recorded absolute remote path) goes to stdout.
 func runSetupBootstrap(o out, spec string, t sshx.Target, opts setupOptions) error {
-	if opts.fromRelease {
-		// The remote-side curl|sh fetch (--from-release) is a distribution-phase path
-		// (PLAN §9.5 source iii). The default in-process stream (source i) below is the
-		// dev + pre-release path that needs no published Release.
-		return configError("setup: --from-release (remote-side fetch) is not wired in this build; omit it to stream the locally-built binary over SSH")
+	// Pick the install route up front so a dev build with --from-release fails fast
+	// (config error, no dial) and the rest of the spine is install-route-agnostic.
+	installer, ierr := selectInstaller(opts, cmdVersion)
+	if ierr != nil {
+		return ierr
 	}
 
-	client, err := sshx.NewClient()
+	client, err := newSSHClient()
 	if err != nil {
 		return sshNotReady(err)
 	}
@@ -53,15 +53,12 @@ func runSetupBootstrap(o out, spec string, t sshx.Target, opts setupOptions) err
 		}
 	}
 
-	// Step 3+4: build the matching static binary locally, stream it over SSH, place it
-	// at the absolute path, chmod 755.
+	// Step 3+4: INSTALL the matching binary at the absolute path via the selected route.
+	// The default streamInstaller cross-builds + streams the bytes over the SAME SSH
+	// connection (no remote egress); --from-release has the remote box fetch the
+	// published installer over its own internet (egress inverted, opt-in).
 	if upload {
-		bin, berr := buildCrossBinary(o, goos, goarch)
-		if berr != nil {
-			return berr
-		}
-		defer func() { _ = os.Remove(bin) }()
-		if err := streamBinary(o, client, t, bin, remoteBin); err != nil {
+		if err := installer.install(o, client, t, goos, goarch, remoteBin); err != nil {
 			return err
 		}
 		o.diag("setup: placed remote binary at %s", remoteBin)

@@ -3,9 +3,15 @@ package cli
 import (
 	"context"
 	"errors"
+	"io/fs"
+	"net"
+	"strings"
+	"syscall"
 	"time"
 
 	"github.com/vybzai/clipbeam-cli/internal/config"
+	"github.com/vybzai/clipbeam-cli/internal/store"
+	"github.com/vybzai/clipbeam-cli/internal/wire"
 )
 
 // loadControl resolves the config + token and builds a control client for the local
@@ -42,6 +48,13 @@ func runLast(o out) error {
 	defer cancel()
 	status, body, err := c.get(ctx, "/last")
 	if err != nil {
+		// The DEFAULT daemonless-exec setup starts NO daemon, so the control dial is
+		// refused / the socket is missing. Fall back to the on-disk last_path that
+		// FinishClipboard already persists (fix [E]). Only on a genuine connect failure —
+		// never shadow a reachable daemon's HTTP status (preserves Mac<->Mac + Tailscale).
+		if isDaemonUnreachable(err) {
+			return emitLastPathFromDisk(o)
+		}
 		return coded(ExitUnreachable, transportErr(err))
 	}
 	switch status {
@@ -59,6 +72,44 @@ func runLast(o out) error {
 	}
 }
 
+// emitLastPathFromDisk reads the on-disk last_path and emits it via the SAME 200 branch
+// shape as the daemon path (bare no-NL path in default mode / pathJSON in --json), else
+// the nothing-available result (fix [E]). Used as the daemonless fallback for last/wait.
+func emitLastPathFromDisk(o out) error {
+	p, err := config.Resolve()
+	if err != nil {
+		return configError("%v", err)
+	}
+	if path, ok := store.ReadLastPath(p.LastPath); ok {
+		if o.json {
+			return o.emitJSON(pathJSON{Schema: schemaVersion, OK: true, Path: &path})
+		}
+		o.data(path) // bare path, NO trailing newline (PLAN §8.1)
+		return nil
+	}
+	return emitNothingPath(o)
+}
+
+// isDaemonUnreachable reports whether err is a genuine "no daemon" connect failure (a
+// refused TCP dial or a missing unix socket — control.go falls back to TCP when no
+// socket exists, so the failure surfaces as a net dial error), as opposed to a reachable
+// daemon returning an HTTP status (fix [E]). It is the gate for the on-disk fallback in
+// last/wait/recv and is shared with the [F] recv disk-drain.
+func isDaemonUnreachable(err error) bool {
+	if err == nil {
+		return false
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) {
+		return true
+	}
+	var opErr *net.OpError
+	if errors.As(err, &opErr) {
+		return true
+	}
+	return errors.Is(err, syscall.ECONNREFUSED) || errors.Is(err, fs.ErrNotExist)
+}
+
 // runWait implements `clipbeam wait` (PLAN §8.1): GET /wait blocks up to the server's
 // fixed 120 s, then prints the bare path (no trailing newline) or, on timeout (204),
 // prints nothing and exits 0. Under --json it wraps the path (null ⇒ timeout).
@@ -73,6 +124,12 @@ func runWait(o out) error {
 	if err != nil {
 		if isTimeout(ctx, err) {
 			return emitNothingPath(o) // a normal long-poll timeout is success (exit 0)
+		}
+		// Daemonless (the default exec setup): no on-disk waiter primitive exists, so do a
+		// ONE-SHOT read of last_path — emit it if present, else nothing (fix [E]). True
+		// long-poll /wait coalescing requires a running daemon.
+		if isDaemonUnreachable(err) {
+			return emitLastPathFromDisk(o)
 		}
 		return coded(ExitUnreachable, transportErr(err))
 	}
@@ -109,6 +166,12 @@ func runRecv(o out, timeout int) error {
 		if isTimeout(ctx, err) {
 			return emitRecvTimeout(o)
 		}
+		// Daemonless (the default exec setup): the agent channel is disk-backed, so drain
+		// the on-disk journal that `clipbeam ingest` persisted (fix [F]). One-shot: an
+		// empty journal is a normal timeout (exit 0).
+		if isDaemonUnreachable(err) {
+			return drainAgentDiskAndEmit(o)
+		}
 		return coded(ExitUnreachable, transportErr(err))
 	}
 	switch status {
@@ -135,6 +198,87 @@ func runRecv(o out, timeout int) error {
 	default:
 		return statusErr(status, body)
 	}
+}
+
+// drainAgentDiskAndEmit is the daemonless recv fallback (fix [F]): it opens a fresh store
+// over the resolved config paths and one-shot-drains the on-disk agent journal. A drained
+// item is emitted through the EXACT same code path as the daemon 200 branch — the labeled
+// body is built by recvBodyString and re-emitted verbatim in default mode, and --json
+// funnels that same body through parseRecvBody → recvJSON — so default and --json output
+// are byte-identical to the daemon path (the frozen interop fixtures are unaffected). An
+// empty journal is a normal recv timeout (exit 0).
+func drainAgentDiskAndEmit(o out) error {
+	cfg, err := config.Load()
+	if err != nil {
+		return configError("%v", err)
+	}
+	p, err := config.Resolve()
+	if err != nil {
+		return configError("%v", err)
+	}
+	saveDir, err := config.ResolvedSaveDir(cfg)
+	if err != nil {
+		return configError("%v", err)
+	}
+	st, err := store.New(store.StoreConfig{
+		SaveDir:           saveDir,
+		AgentInboxDir:     p.AgentInbox,
+		LastPathFile:      p.LastPath,
+		RecentsFile:       p.Recents,
+		SaveTextToDisk:    cfg.SaveTextToDisk,
+		LongTextThreshold: cfg.LongTextThreshold,
+		MaxBytes:          maxBytesOf(cfg),
+	})
+	if err != nil {
+		return coded(ExitGeneric, err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	item, derr := st.DrainAgentDisk(ctx)
+	if derr != nil {
+		return coded(ExitGeneric, derr)
+	}
+	if item == nil {
+		return emitRecvTimeout(o) // empty journal — nothing to dequeue
+	}
+	body := recvBodyString(item)
+	if o.json {
+		it := parseRecvBody(body)
+		return o.emitJSON(recvJSON{
+			Schema:  schemaVersion,
+			OK:      true,
+			Type:    it.Type,
+			Sender:  it.Sender,
+			Path:    nilIfEmpty(it.Path),
+			Text:    textPtr(it),
+			Channel: "agent",
+			Cid:     nilIfEmpty(it.Cid),
+		})
+	}
+	o.data(body) // labeled block VERBATIM, no trailing newline (byte-identical to /recv)
+	return nil
+}
+
+// recvBodyString builds the labeled /recv body for a drained agent item — the SAME
+// builder as httpd.recvBodyString (Server.swift:767-769, PLAN §8.2): type/sender, an
+// optional path (image/file), then text LAST (it may contain newlines), colon-SPACE
+// separators, NO trailing newline. Duplicated here (the httpd version is unexported in
+// another package) so the daemonless disk-drain emits byte-identical output to the daemon.
+func recvBodyString(item *wire.AgentItem) string {
+	var b strings.Builder
+	b.WriteString("type: ")
+	b.WriteString(item.Type)
+	b.WriteString("\nsender: ")
+	b.WriteString(item.Sender)
+	if item.Path != nil {
+		b.WriteString("\npath: ")
+		b.WriteString(*item.Path)
+	}
+	if item.Text != nil {
+		b.WriteString("\ntext: ")
+		b.WriteString(*item.Text)
+	}
+	return b.String()
 }
 
 // itoa renders a non-negative int as decimal without importing strconv at the call
