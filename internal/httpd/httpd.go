@@ -70,6 +70,11 @@ type Server struct {
 	opts   Options
 	srv    *http.Server
 	single *singleFlight
+	// onSlotAcquired, if non-nil, is called right after the /clip single-flight slot
+	// is acquired. Test-only seam (nil in production) so a test can deterministically
+	// observe that the SERVER holds the slot before racing a second request — the
+	// client merely transmitting a request body does not imply the slot is held.
+	onSlotAcquired func()
 }
 
 // New builds a Server with the route table wired. It does not bind a socket; call

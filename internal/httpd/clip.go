@@ -66,6 +66,9 @@ func (s *Server) handleClip(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer s.single.release()
+	if s.onSlotAcquired != nil {
+		s.onSlotAcquired() // test-only seam; nil in production
+	}
 
 	// Running raw-byte enforcement against the ceiling regardless of Content-Length:
 	// MaxBytesReader trips at ceiling+1 and we map its error to our EXPLICIT 413, not

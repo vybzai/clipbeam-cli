@@ -323,6 +323,17 @@ func TestClipSingleFlight(t *testing.T) {
 	req1.Header.Set(tokenHeader, testToken)
 	req1.ContentLength = int64(len(full))
 
+	// Signal when the SERVER acquires the single-flight slot. The client transmitting
+	// req1's body does NOT imply the server holds the slot yet (that was the flake),
+	// so we wait on this hook before racing the second request.
+	acquired := make(chan struct{}, 1)
+	h.srv.onSlotAcquired = func() {
+		select {
+		case acquired <- struct{}{}:
+		default:
+		}
+	}
+
 	type result struct {
 		status int
 		err    error
@@ -339,9 +350,11 @@ func TestClipSingleFlight(t *testing.T) {
 		first <- result{status: resp.StatusCode}
 	}()
 
-	// Wait until the handler has acquired the slot (the reader was read at least once).
-	if !br.waitStarted(2 * time.Second) {
-		t.Fatal("first /clip never started reading")
+	// Wait until req1 holds the slot (server-side) before racing the second request.
+	select {
+	case <-acquired:
+	case <-time.After(3 * time.Second):
+		t.Fatal("first /clip never acquired the single-flight slot")
 	}
 
 	// Second concurrent /clip must get 503 busy.
@@ -375,51 +388,17 @@ func TestClipSingleFlight(t *testing.T) {
 	_ = readBody(t, resp3)
 }
 
-// blockingReader yields its data only after gate is closed, and signals when it is
-// first read so the test knows the handler holds the single-flight slot.
+// blockingReader sends its data only after gate is closed, so the first /clip holds
+// the single-flight slot until the test releases it.
 type blockingReader struct {
-	data    []byte
-	i       int
-	gate    chan struct{}
-	mu      sync.Mutex
-	started bool
-	startCh chan struct{}
-}
-
-func (b *blockingReader) waitStarted(d time.Duration) bool {
-	b.mu.Lock()
-	if b.startCh == nil {
-		b.startCh = make(chan struct{})
-	}
-	if b.started {
-		b.mu.Unlock()
-		return true
-	}
-	ch := b.startCh
-	b.mu.Unlock()
-	select {
-	case <-ch:
-		return true
-	case <-time.After(d):
-		return false
-	}
+	data []byte
+	i    int
+	gate chan struct{}
 }
 
 func (b *blockingReader) Read(p []byte) (int, error) {
-	b.mu.Lock()
-	if b.startCh == nil {
-		b.startCh = make(chan struct{})
-	}
-	if !b.started {
-		b.started = true
-		close(b.startCh)
-	}
-	b.mu.Unlock()
-
-	// Deliver the first chunk immediately so the handler enters the body read and
-	// holds the slot, then block on the remainder until released.
+	// Block on the first read until released, so req1 stays in-flight holding the slot.
 	if b.i == 0 {
-		// hand over a tiny prefix so the parser begins, then block.
 		<-b.gate
 	}
 	if b.i >= len(b.data) {
