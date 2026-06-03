@@ -4,7 +4,7 @@
 # static Linux ELFs and self-contained darwin Mach-O binaries (CGO_ENABLED=0,
 # netgo + osusergo), a darwin universal binary, tar.gz archives carrying the
 # offline installer + docs, a SHA-256 checksums.txt, a syft SBOM, a Homebrew
-# cask in <org>/homebrew-tap with the quarantine-strip post-install hook, and a
+# cask in vybzai/homebrew-tap with the quarantine-strip post-install hook, and a
 # cosign keyless signature over checksums.txt.
 #
 # M4 VERSION-PIN NOTE (PLAN §9.2): the homebrew_casks `hooks.post.install` key

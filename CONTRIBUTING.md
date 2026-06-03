@@ -8,7 +8,7 @@ interop* and keeping the security properties intact.
 
 ```sh
 git clone https://github.com/vybzai/clipbeam-cli.git
-cd clipbeam
+cd clipbeam-cli
 go build ./...
 go test ./...
 ```

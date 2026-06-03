@@ -30,12 +30,14 @@
 set -eu
 
 # ----------------------------------------------------------------------------
-# Constants (the <org> placeholder is resolved at org-creation time — PLAN §10.3)
+# Constants — the CLI ships from vybzai/clipbeam-cli (no separate org).
 # ----------------------------------------------------------------------------
-ORG="clipbeam"
-REPO="clipbeam"
+ORG="vybzai"
+REPO="clipbeam-cli"
 GITHUB="https://github.com/${ORG}/${REPO}"
 API="https://api.github.com/repos/${ORG}/${REPO}"
+# Scheme-less Go module path for the `go install` source-build hint.
+MODULE="github.com/${ORG}/${REPO}"
 BINARY="clipbeam"
 
 # ----------------------------------------------------------------------------
@@ -123,7 +125,7 @@ detect_os() {
   case "$_u" in
     Darwin) printf 'darwin' ;;
     Linux)  printf 'linux' ;;
-    *) die "unsupported OS '$_u'. Build from source: go install ${GITHUB}/cmd/clipbeam@latest" ;;
+    *) die "unsupported OS '$_u'. Build from source: go install ${MODULE}/cmd/clipbeam@latest" ;;
   esac
 }
 
@@ -132,7 +134,7 @@ detect_arch() {
   case "$_m" in
     x86_64|amd64)  printf 'amd64' ;;
     arm64|aarch64) printf 'arm64' ;;
-    *) die "unsupported arch '$_m'. Build from source: go install ${GITHUB}/cmd/clipbeam@latest" ;;
+    *) die "unsupported arch '$_m'. Build from source: go install ${MODULE}/cmd/clipbeam@latest" ;;
   esac
 }
 
@@ -247,7 +249,7 @@ if [ "$VERIFY_SIGNATURE" -eq 1 ]; then
   cosign verify-blob \
     --certificate "${TMP}/checksums.txt.pem" \
     --signature "${TMP}/checksums.txt.sig" \
-    --certificate-identity-regexp "https://github.com/${ORG}/${REPO}" \
+    --certificate-identity-regexp "https://github\.com/vybzai/clipbeam-cli" \
     --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
     "$CHECKSUMS" \
     || die "cosign verification FAILED — refusing to install"

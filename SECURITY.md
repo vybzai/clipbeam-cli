@@ -20,7 +20,7 @@ vulnerability"). Please do **not** open a public issue for a security problem.
 
 Security fixes target the **latest released minor version**. Older versions are
 patched only at the maintainers' discretion. Always run the latest release
-(`clipbeam self-update` or `brew upgrade`).
+(re-run the installer, or `brew upgrade` once the Homebrew tap is live).
 
 ## Threat model (per transport tier)
 

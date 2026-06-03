@@ -7,7 +7,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The wire protocol version (`Envelope.version`) is the integer `1` and is
 decoupled from the CLI's SemVer — it is not bumped to match a release.
 
-## [Unreleased]
+## [0.1.0] - 2026-06-03
 
 ### Added
 - Initial implementation of the `clipbeam` CLI.
@@ -33,4 +33,4 @@ decoupled from the CLI's SemVer — it is not bumped to match a release.
 - Distribution: `install.sh`, GoReleaser config (multi-arch archives, checksums,
   SBOM, Homebrew cask, cosign keyless signing), and CI.
 
-[Unreleased]: https://github.com/vybzai/clipbeam-cli/commits/main
+[0.1.0]: https://github.com/vybzai/clipbeam-cli/releases/tag/v0.1.0

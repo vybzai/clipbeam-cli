@@ -2,7 +2,7 @@
 #
 # Produces: static binaries, darwin universal binary, tar.gz archives (binary +
 # install.sh + README + LICENSE + SECURITY.md + PROTOCOL.md), checksums.txt,
-# a syft SBOM, the Homebrew cask pushed to <org>/homebrew-tap, and a cosign
+# a syft SBOM, the Homebrew cask pushed to vybzai/homebrew-tap, and a cosign
 # keyless signature over checksums.txt (Sigstore Fulcio/Rekor via OIDC).
 
 name: release
@@ -44,5 +44,5 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Pushes the Homebrew cask to the dedicated <org>/homebrew-tap repo.
+          # Pushes the Homebrew cask to the dedicated vybzai/homebrew-tap repo.
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}

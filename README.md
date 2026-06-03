@@ -2,7 +2,10 @@
 
 # clipbeam
 
-**Beam files, screenshots, and clipboard straight into your remote agent's reach — over SSH or Tailscale. No cloud, no account.**
+**Give your remote coding agent eyes and an inbox.** Beam a screenshot, file, or
+message straight onto a headless box — over the SSH you already have, or
+Tailscale. It lands a real file on the box's disk and **prints the absolute
+path**, so your agent just reads it. No cloud, no account.
 
 Built for coding agents: every command is `--json`-able and self-describing.
 
@@ -17,24 +20,34 @@ Built for coding agents: every command is `--json`-able and self-describing.
 ## What it solves
 
 You run a coding agent (Claude Code, OpenClaw, Hermes, aider, …) on a headless
-Linux box — a Hostinger / Vultr / homelab VPS — and you SSH in to drive it. You
-**cannot paste an image into that remote TUI**: the terminal reads your *local*
+Linux box — a Hostinger / Vultr / homelab VPS — and you SSH in to drive it. Then
+you hit the wall: you have a screenshot or a file **on your laptop**, and you
+**cannot paste it into that remote TUI**. The terminal reads your *local*
 machine's clipboard, and there is no shared pasteboard across the SSH boundary.
-The only thing a remote agent can ingest is a **real file on the box's disk that
-it can read by absolute path**.
+The only thing a remote agent can actually ingest is a **real file on the box's
+disk that it can read by absolute path**.
 
-`clipbeam` does exactly that. From your laptop it beams a file, a screenshot, or
-your clipboard into the box you are already SSH'd into, lands it on the box's
-disk, and **prints the absolute path** — so your agent just reads it.
+`clipbeam` closes that gap and gives the remote agent two capabilities it
+otherwise can't have:
 
-```sh
-# on the box, in your agent:
-claude "what's in $(clipbeam last)"
-```
+- **Eyes.** Beam a screenshot, an image, or any file from your laptop into the
+  box you're already SSH'd into. `clipbeam` lands it on the box's disk and
+  **prints the absolute path**, so your agent just reads it:
 
-It speaks [ClipBeam](https://github.com/vybzai/clipbeam-mac)'s frozen **Envelope v1**
-wire protocol byte-for-byte, so the macOS `ClipBeam.app` and the `clipbeam` CLI
-**interoperate** over Tailscale.
+  ```sh
+  # on the box, in your agent:
+  claude "what's in $(clipbeam last)"
+  ```
+
+- **An inbox.** A private agent-to-agent channel — an in-memory FIFO inbox that
+  **never touches the human's clipboard or notifications**. One agent beams a
+  message or a file to it; the other drains it one item at a time (see
+  [Built for agents](#built-for-agents)).
+
+No cloud, no account, no open ports: `clipbeam` rides the SSH connection you
+already have. It speaks the macOS ClipBeam.app's (source private) frozen
+**Envelope v1** wire protocol byte-for-byte, so the `ClipBeam.app` and the
+`clipbeam` CLI **interoperate** over Tailscale.
 
 ## Demo
 
@@ -84,9 +97,10 @@ peer instead — same wire, always-on.
 
 ## Built for agents
 
-Every command emits a stable, versioned JSON object with `--json`, uses a
-documented deterministic exit-code table, and is self-describing via
-`clipbeam schema` — so an AI agent can drive it with no human and no guessing.
+Every command emits a stable, versioned JSON object with `--json` (or set
+`CLIPBEAM_JSON=1`), uses a documented deterministic exit-code table, and is
+self-describing via `clipbeam schema` — so an AI agent can drive it with no human
+and no guessing.
 
 ```sh
 # agent A on the laptop → agent B on the box, on a private channel that never
@@ -151,8 +165,8 @@ traversal-proof.
 ## Interop
 
 `clipbeam` is a from-scratch Go re-implementation of the **frozen Envelope v1**
-protocol shipped by the macOS [`ClipBeam.app`](https://github.com/vybzai/clipbeam-mac).
-The wire is validated by golden fixtures captured from the real Swift app
+protocol shipped by the macOS `ClipBeam.app` (source private). The wire is
+validated by golden fixtures captured from the real Swift app
 (`testdata/interop/`) and asserted in CI in both directions — so a Mac and a Linux
 box interoperate over Tailscale out of the box. The protocol is described in
 [PROTOCOL.md](PROTOCOL.md) (the Swift source + fixtures are authoritative).
@@ -161,7 +175,7 @@ box interoperate over Tailscale out of the box. The protocol is described in
 
 ```sh
 git clone https://github.com/vybzai/clipbeam-cli
-cd clipbeam
+cd clipbeam-cli
 CGO_ENABLED=0 go build ./cmd/clipbeam
 go test -race ./...
 ```
