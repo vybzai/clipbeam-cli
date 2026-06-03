@@ -7,6 +7,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The wire protocol version (`Envelope.version`) is the integer `1` and is
 decoupled from the CLI's SemVer — it is not bumped to match a release.
 
+## [0.1.2] - 2026-06-03
+
+### Added
+- **Homebrew**: `brew install vybzai/tap/clipbeam` — the cask is now published to
+  the `vybzai/homebrew-tap` tap.
+
+### Changed
+- CI: bumped `actions/checkout` and `actions/setup-go` to current majors (off the
+  deprecated Node 20 runtime).
+
 ## [0.1.1] - 2026-06-03
 
 ### Fixed
@@ -64,5 +74,6 @@ decoupled from the CLI's SemVer — it is not bumped to match a release.
 - Distribution: `install.sh`, GoReleaser config (multi-arch archives, checksums,
   SBOM, Homebrew cask, cosign keyless signing), and CI.
 
+[0.1.2]: https://github.com/vybzai/clipbeam-cli/releases/tag/v0.1.2
 [0.1.1]: https://github.com/vybzai/clipbeam-cli/releases/tag/v0.1.1
 [0.1.0]: https://github.com/vybzai/clipbeam-cli/releases/tag/v0.1.0
